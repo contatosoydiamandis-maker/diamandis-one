@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
 type SaveGame = { id: string; name: string; savePath: string; addedAt: string };
+type TotkCampaign = { id: string; name: string; path: string; createdAt: string };
 type SaveBackup = { id: string; gameId: string; gameName: string; createdAt: string; sourcePath: string; sizeBytes: number; fileCount: number; fileHashes: Record<string, string>; backupPath: string };
 
 const formatSize = (bytes: number) => {
@@ -31,6 +32,11 @@ export default function SaveCenter() {
   const [workingId, setWorkingId] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [totkInstall, setTotkInstall] = useState("");
+  const [totkName, setTotkName] = useState("");
+  const [totkCampaigns, setTotkCampaigns] = useState<TotkCampaign[]>([]);
+  const [totkRunning, setTotkRunning] = useState(false);
+  const [totkBusy, setTotkBusy] = useState(false);
 
   const refresh = useCallback(async (gameId?: string) => {
     setBusy(true); setError("");
@@ -46,9 +52,36 @@ export default function SaveCenter() {
     finally { setBusy(false); }
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  const refreshTotk = useCallback(async () => {
+    try { const [campaigns, running] = await Promise.all([invoke<TotkCampaign[]>("list_totk_campaigns"), invoke<boolean>("is_totk_running")]); setTotkCampaigns(campaigns); setTotkRunning(running); }
+    catch (e) { setError(String(e)); }
+  }, []);
+
+  useEffect(() => { void refresh(); void refreshTotk(); }, [refresh, refreshTotk]);
 
   const selected = useMemo(() => games.find(game => game.id === selectedGame), [games, selectedGame]);
+
+  const browseTotkInstall = async () => {
+    try { const selectedPath = await open({ directory: true, multiple: false, title: "Selecione a pasta que contém totk.exe" });
+      if (typeof selectedPath === "string") { setTotkBusy(true); const saved = await invoke<string>("configure_totk_install", { installPath: selectedPath }); setTotkInstall(saved); setNotice("Instalação do TOTK Recomp validada."); await refreshTotk(); }
+    } catch (e) { setError(String(e)); } finally { setTotkBusy(false); }
+  };
+  const createTotkCampaign = async (mode: "import" | "empty") => {
+    if (!totkName.trim()) return; setTotkBusy(true); setError(""); setNotice("");
+    try { const campaign = await invoke<TotkCampaign>(mode === "import" ? "import_totk_profile" : "create_empty_totk_campaign", { name: totkName });
+      try { await invoke<SaveGame>("add_save_game", { name: "TOTK Recomp • " + campaign.name, savePath: campaign.path }); } catch (e) { if (!String(e).includes("já cadastrada")) throw e; }
+      setTotkName(""); setNotice(mode === "import" ? "Campanha importada por cópia. O profile original permaneceu intacto." : "Campanha vazia criada. Esta build pode exigir um profile válido para inicializar."); await refreshTotk(); await refresh();
+    } catch (e) { setError(String(e)); } finally { setTotkBusy(false); }
+  };
+  const launchTotkCampaign = async (campaign: TotkCampaign) => {
+    setTotkBusy(true); setError(""); setNotice("");
+    try { let game = games.find(item => item.savePath === campaign.path);
+      if (!game) game = await invoke<SaveGame>("add_save_game", { name: "TOTK Recomp • " + campaign.name, savePath: campaign.path });
+      const backup = await invoke<SaveBackup>("create_save_backup", { gameId: game.id });
+      await invoke("launch_totk_campaign", { campaignId: campaign.id });
+      setNotice("Backup preventivo concluído (" + backup.fileCount + " arquivo(s)). Campanha iniciada."); await refreshTotk(); await refresh(game.id);
+    } catch (e) { setError(String(e)); } finally { setTotkBusy(false); }
+  };
 
   const browseSaveFolder = async () => {
     setError("");
@@ -99,6 +132,19 @@ export default function SaveCenter() {
       <div className="save-center-total"><strong>{games.length.toString().padStart(2, "0")}</strong><span>JOGOS</span></div>
     </div>
 
+    <div className="save-center-toolbar">
+      <div><span className="tool-kicker">ADAPTADOR ESPECIALIZADO</span><h3>Zelda: TOTK Recomp</h3><p>Campanhas isoladas com TOTK_PROFILE_DIR. O perfil original é somente origem de importação.</p></div>
+      <button className="secondary-button" onClick={() => void browseTotkInstall()} disabled={totkBusy}><FolderOpen size={14}/> {totkInstall ? "Alterar instalação" : "Localizar totk.exe"}</button>
+    </div>
+    <div className="save-safety-strip"><ShieldCheck size={15}/><span>{totkInstall ? "Instalação validada: " + totkInstall : "Selecione a pasta que contém totk.exe para ativar o adaptador."} {totkRunning ? "O jogo está em execução. Alterações de campanha estão bloqueadas." : "Ao iniciar, o DIAMANDIS ONE cria um backup preventivo."}</span></div>
+    <div className="save-add-form">
+      <div className="save-panel-heading"><strong>Nova campanha</strong><span>Importar ou começar do zero</span></div>
+      <label>Nome da campanha<input value={totkName} onChange={e => setTotkName(e.target.value)} placeholder="Ex.: Principal, 100%, Sem glitches"/></label>
+      <div className="save-form-actions"><button className="secondary-button" onClick={() => void createTotkCampaign("import")} disabled={!totkInstall || !totkName.trim() || totkBusy || totkRunning}><Archive size={14}/> Importar profile atual</button><button className="primary-button compact" onClick={() => void createTotkCampaign("empty")} disabled={!totkInstall || !totkName.trim() || totkBusy || totkRunning}><Plus size={13}/> Criar vazia</button></div>
+      <small>Importar copia a pasta profile da instalação. Criar vazia não garante que todas as builds inicializem o perfil automaticamente.</small>
+    </div>
+    <div className="save-history-heading"><div><h4>Campanhas TOTK Recomp</h4><p>{totkCampaigns.length} campanha(s) • cada uma usa uma pasta independente</p></div><button className="secondary-button" onClick={() => void refreshTotk()} disabled={totkBusy}><RefreshCw size={14}/></button></div>
+    {totkCampaigns.length ? <div className="save-backup-list">{totkCampaigns.map(campaign => <article className="save-backup-row" key={campaign.id}><div className="save-backup-icon"><Archive size={16}/></div><div className="save-backup-info"><strong>{campaign.name}</strong><span>{formatDate(campaign.createdAt)} • Perfil isolado</span><small>{campaign.path}</small></div><button className="primary-button compact" onClick={() => void launchTotkCampaign(campaign)} disabled={totkBusy || totkRunning}>Jogar</button></article>)}</div> : <div className="save-empty compact-empty"><Archive size={22}/><strong>Nenhuma campanha TOTK</strong><span>Valide a instalação e importe seu profile ou crie uma campanha vazia.</span></div>}
     <div className="save-center-toolbar">
       <div><span className="tool-kicker">BIBLIOTECA DE SAVES</span><h3>Jogos cadastrados</h3><p>Compatibilidade universal por pasta. Integrações automáticas serão adicionadas por adaptadores.</p></div>
       <button className="secondary-button" onClick={() => void refresh(selectedGame || undefined)} disabled={busy}><RefreshCw size={14} className={busy ? "spin" : ""}/> Atualizar</button>
