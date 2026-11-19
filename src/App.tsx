@@ -84,7 +84,7 @@ function App() {
 
         <div className="sidebar-bottom">
           <div className="local-card"><div className="local-icon"><ShieldCheck size={17} /></div><div><strong>Local-first</strong><span>Seus dados ficam no seu PC</span></div><CheckCircle2 size={14} className="local-check" /></div>
-          <div className="version">DIAMANDIS ONE <span>v0.1.1</span></div>
+          <div className="version">DIAMANDIS ONE <span>v0.2.0</span></div>
         </div>
       </aside>
 
@@ -120,7 +120,7 @@ function App() {
               <button className="status-card diagnostic-card" onClick={runDiagnostic}><div className="status-icon"><AppWindow size={18}/></div><div><span>DIAGNÓSTICO DO CORE</span><strong>Executar verificação <ArrowUpRight size={13}/></strong><small>{diagnostic}</small></div></button>
             </section>
           </> : active === "files" ? <FileManager/> : active === "toolbox" ? <Toolbox/> : active === "games" ? <GameHub/> : active === "saves" ? <SaveCenter/> : active === "settings" ? <Settings/> : <ModulePlaceholder id={active} onBack={() => setActive("overview")}/>}
-          <footer><span>DIAMANDIS ONE <b>•</b> BUILT FOR YOUR DESKTOP</span><span><Clock3 size={12}/> PRÉ-ALPHA 0.1.1</span></footer>
+          <footer><span>DIAMANDIS ONE <b>•</b> BUILT FOR YOUR DESKTOP</span><span><Clock3 size={12}/> PRÉ-ALPHA 0.2.0</span></footer>
         </div>
       </main>
     </div>
