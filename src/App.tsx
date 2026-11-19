@@ -136,6 +136,8 @@ function FileManager() {
   const [listing, setListing] = useState<Listing | null>(null);
   const [path, setPath] = useState("");
   const [filter, setFilter] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "size" | "type">("name");
+  const [kindFilter, setKindFilter] = useState<"all" | "folders" | "files">("all");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [newName, setNewName] = useState("");
@@ -175,7 +177,17 @@ function FileManager() {
     return () => { active = false; };
   }, []);
 
-  const visible = useMemo(() => listing?.entries.filter(x => x.name.toLowerCase().includes(filter.toLowerCase())) ?? [], [listing, filter]);
+  const visible = useMemo(() => {
+    const items = (listing?.entries ?? []).filter(item =>
+      item.name.toLocaleLowerCase().includes(filter.toLocaleLowerCase()) &&
+      (kindFilter === "all" || (kindFilter === "folders" ? item.isDir : !item.isDir))
+    );
+    return items.sort((a, b) => {
+      if (sortBy === "type") return Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name, "pt-BR");
+      if (sortBy === "size") return (b.size ?? -1) - (a.size ?? -1);
+      return Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name, "pt-BR");
+    });
+  }, [listing, filter, kindFilter, sortBy]);
   const create = async (event: FormEvent) => {
     event.preventDefault(); if (!listing || !newName.trim()) return;
     try { await invoke("create_directory", { parent: listing.path, name: newName.trim() }); setNewName(""); setShowNew(false); await load(listing.path); }
@@ -219,9 +231,9 @@ function FileManager() {
       <button className="danger-action" onClick={() => openAction("delete")}>Enviar à Lixeira</button>
     </div></div>}
     {error && <div className="file-message error-message">{error}</div>}
-    <div className="file-list-header"><div><h3>Arquivos e pastas</h3><p>{listing?.path ?? (settingsLoaded ? "Escolha uma pasta para começar" : "Carregando preferências...")}</p></div><div className="file-list-actions"><span>{visible.length} ITENS</span><label className="file-search"><Search size={14}/><input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filtrar nesta pasta"/></label></div></div>
+    <div className="file-list-header"><div><h3>Arquivos e pastas</h3><p>{listing?.path ?? (settingsLoaded ? "Escolha uma pasta para começar" : "Carregando preferências...")}</p></div><div className="file-list-actions"><span className="file-count">{visible.length} / {listing?.entries.length ?? 0} ITENS</span><select className="file-sort" aria-label="Ordenar arquivos" value={sortBy} onChange={e => setSortBy(e.target.value as "name" | "size" | "type")}><option value="name">Nome</option><option value="type">Tipo</option><option value="size">Tamanho</option></select><select className="file-sort" aria-label="Filtrar tipo" value={kindFilter} onChange={e => setKindFilter(e.target.value as "all" | "folders" | "files")}><option value="all">Tudo</option><option value="folders">Pastas</option><option value="files">Arquivos</option></select><label className="file-search"><Search size={14}/><input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filtrar nesta pasta"/></label></div></div>
     <div className="file-table"><div className="file-table-head"><span>NOME</span><span>TIPO</span><span>TAMANHO</span></div>
-      {busy ? <div className="file-empty"><LoaderCircle className="spin" size={24}/><strong>Carregando pasta...</strong></div> : visible.length ? visible.map(item => <div role="button" tabIndex={0} className={selected?.path === item.path ? "file-row selected" : "file-row"} key={item.path} onClick={() => setSelected(item)} onDoubleClick={() => item.isDir && void load(item.path)} onKeyDown={e => { if (e.key === "Enter") item.isDir && void load(item.path); }}>
+      {busy ? <div className="file-empty"><LoaderCircle className="spin" size={24}/><strong>Carregando pasta...</strong></div> : visible.length ? visible.map(item => <div role="button" tabIndex={0} className={selected?.path === item.path ? "file-row selected" : "file-row"} key={item.path} onClick={() => setSelected(item)} onDoubleClick={() => item.isDir && void load(item.path)} onKeyDown={e => { if (e.key === "Enter") item.isDir && void load(item.path); if (e.key === "Delete") { setSelected(item); setAction("delete"); setActionValue(""); } }}>
         <span className="file-name">{item.isDir ? <Folder size={18} className="folder-color"/> : <File size={17}/>}<strong>{item.name}</strong></span><span>{item.isDir ? "Pasta" : "Arquivo"}</span><span>{size(item.size)}</span>
       </div>) : <div className="file-empty"><Folder size={25}/><strong>{filter ? "Nenhum resultado" : "Esta pasta está vazia"}</strong><span>Os itens desta localização aparecerão aqui.</span></div>}
     </div><div className="file-manager-foot"><ShieldCheck size={14}/> Exclusões vão para a Lixeira. Cópias e movimentos não sobrescrevem arquivos existentes.</div>
