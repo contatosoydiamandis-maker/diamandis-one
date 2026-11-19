@@ -32,6 +32,12 @@
 | SQLite e migrações | Planejado |
 | Testes automatizados e instalador | Ainda não validados |
 
+## Instalação para usuários
+
+A versão distribuída será instalada por um assistente gráfico do Windows. Usuários finais não precisarão instalar Node.js ou Rust, nem abrir CMD ou PowerShell. Consulte [Instalação e uso](docs/INSTALLATION.md) para conhecer o fluxo planejado e o estado atual da distribuição.
+
+O workflow de instalador pode ser executado manualmente pela aba **Actions** do GitHub ou por uma tag `v*`. Os pacotes gerados ficam como artefatos de teste; tags criam uma Release em rascunho para revisão antes da publicação. Nenhum instalador será considerado estável sem testes reais no Windows.
+
 ## Executar no Windows
 
 ### Requisitos
