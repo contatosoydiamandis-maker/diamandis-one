@@ -72,7 +72,7 @@ fn write_games(app: &AppHandle, games: &[SaveGame]) -> Result<(), String> {
         let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
         file.write_all(&bytes)?;
         file.sync_all()?;
-        fs::rename(&temp, &path)?;
+        crate::atomic_file::replace(&temp, &path)?;
         Ok(())
     })();
     if result.is_err() { let _ = fs::remove_file(&temp); }
