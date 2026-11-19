@@ -42,6 +42,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Node.js for generated desktop assets
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare desktop icon
+        run: node scripts/prepare-assets.mjs
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust dependencies
