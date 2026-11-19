@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AppWindow, ArrowUpRight, Boxes, CheckCircle2, ChevronRight, CircleHelp,
-  Clock3, Command, FileSearch, FolderKanban, Gamepad2, HardDrive,
-  Image, LayoutDashboard, Search, Settings2, ShieldCheck, Sparkles,
+  AppWindow, ArrowLeft, ArrowUpRight, Boxes, CheckCircle2, ChevronRight, CircleHelp,
+  Clock3, Command, File, FileSearch, Folder, FolderKanban, FolderPlus, Gamepad2, HardDrive,
+  Image, LayoutDashboard, LoaderCircle, RefreshCw, Search, Settings2, ShieldCheck, Sparkles,
   Wrench, Zap
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -109,12 +109,51 @@ function App() {
               <div className="status-card"><div className="status-icon"><ShieldCheck size={18}/></div><div><span>PRIVACIDADE</span><strong>Controle local</strong><small>Sem telemetria invasiva</small></div></div>
               <button className="status-card diagnostic-card" onClick={runDiagnostic}><div className="status-icon"><AppWindow size={18}/></div><div><span>DIAGNÓSTICO DO CORE</span><strong>Executar verificação <ArrowUpRight size={13}/></strong><small>{diagnostic}</small></div></button>
             </section>
-          </> : <ModulePlaceholder id={active} onBack={() => setActive("overview")}/>}
+          </> : active === "files" ? <FileManager/> : <ModulePlaceholder id={active} onBack={() => setActive("overview")}/>}
           <footer><span>DIAMANDIS ONE <b>•</b> BUILT FOR YOUR DESKTOP</span><span><Clock3 size={12}/> VERSÃO DE FUNDAÇÃO 0.1.0</span></footer>
         </div>
       </main>
     </div>
   );
+}
+
+
+function FileManager() {
+  type Entry = { name: string; path: string; isDir: boolean; size: number | null };
+  type Listing = { path: string; parent: string | null; entries: Entry[] };
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [path, setPath] = useState("");
+  const [filter, setFilter] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [newName, setNewName] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const load = useCallback(async (target?: string) => {
+    setBusy(true); setError("");
+    try { const data = await invoke<Listing>("list_directory", { path: target || null }); setListing(data); setPath(data.path); }
+    catch (e) { setError(String(e)); } finally { setBusy(false); }
+  }, []);
+  useEffect(() => { if (!listing) void load(); }, [listing, load]);
+  const visible = useMemo(() => listing?.entries.filter(x => x.name.toLowerCase().includes(filter.toLowerCase())) ?? [], [listing, filter]);
+  const create = async (event: React.FormEvent) => {
+    event.preventDefault(); if (!listing || !newName.trim()) return;
+    try { await invoke("create_directory", { parent: listing.path, name: newName.trim() }); setNewName(""); setShowNew(false); await load(listing.path); }
+    catch (e) { setError(String(e)); }
+  };
+  const size = (n: number | null) => n === null ? "—" : n < 1024 ? n + " B" : n < 1048576 ? (n/1024).toFixed(1)+" KB" : n < 1073741824 ? (n/1048576).toFixed(1)+" MB" : (n/1073741824).toFixed(2)+" GB";
+  return <section className="file-manager">
+    <div className="file-toolbar"><div className="file-toolbar-left">
+      <button className="toolbar-button" disabled={!listing?.parent || busy} onClick={() => listing?.parent && void load(listing.parent)} title="Pasta anterior"><ArrowLeft size={16}/></button>
+      <form className="path-form" onSubmit={e => {e.preventDefault(); void load(path);}}><HardDrive size={15}/><input aria-label="Caminho da pasta" value={path} onChange={e => setPath(e.target.value)} placeholder="Caminho da pasta..."/></form>
+      <button className="toolbar-button" disabled={busy} onClick={() => void load(path || undefined)} title="Atualizar"><RefreshCw size={15}/></button>
+    </div><button className="primary-button compact" onClick={() => setShowNew(v => !v)}><FolderPlus size={15}/> Nova pasta</button></div>
+    {showNew && <form className="new-folder-form" onSubmit={create}><FolderPlus size={16}/><input autoFocus value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome da nova pasta"/><button className="primary-button compact" disabled={!newName.trim()}>Criar pasta</button><button type="button" className="toolbar-button" onClick={() => setShowNew(false)}>Cancelar</button></form>}
+    {error && <div className="file-message error-message">{error}</div>}
+    <div className="file-list-header"><div><h3>Arquivos e pastas</h3><p>{listing?.path ?? "Escolha uma pasta para começar"}</p></div><div className="file-list-actions"><span>{visible.length} ITENS</span><label className="file-search"><Search size={14}/><input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filtrar nesta pasta"/></label></div></div>
+    <div className="file-table"><div className="file-table-head"><span>NOME</span><span>TIPO</span><span>TAMANHO</span></div>
+      {busy ? <div className="file-empty"><LoaderCircle className="spin" size={24}/><strong>Carregando pasta...</strong></div> : visible.length ? visible.map(item => <button className="file-row" key={item.path} onClick={() => item.isDir && void load(item.path)}><span className="file-name">{item.isDir ? <Folder size={18} className="folder-color"/> : <File size={17}/>}<strong>{item.name}</strong></span><span>{item.isDir ? "Pasta" : "Arquivo"}</span><span>{size(item.size)}</span></button>) : <div className="file-empty"><Folder size={25}/><strong>{filter ? "Nenhum resultado" : "Esta pasta está vazia"}</strong><span>Os itens desta localização aparecerão aqui.</span></div>}
+    </div><div className="file-manager-foot"><ShieldCheck size={14}/> Navegação e criação de pastas. Nenhum arquivo será removido ou sobrescrito.</div>
+  </section>;
 }
 
 function ModuleCard({ icon: Icon, title, desc, meta, onClick }: { icon: LucideIcon; title: string; desc: string; meta: string; onClick: () => void }) {
