@@ -157,11 +157,14 @@ pub async fn launch_totk_campaign(app: AppHandle, campaign_id: String) -> Result
         let campaign_path = PathBuf::from(&campaign.path).canonicalize().map_err(|_| "A pasta da campanha não está disponível.".to_string())?;
         let managed_root = root(&app)?.join("campaigns").canonicalize().map_err(|_| "A biblioteca de campanhas não está disponível.".to_string())?;
         if !campaign_path.starts_with(&managed_root) || !campaign_path.is_dir() { return Err("O caminho da campanha não pertence à biblioteca segura do DIAMANDIS ONE.".into()); }
+        // O backup é obrigatório no backend, não apenas na interface. Assim,
+        // nenhuma chamada IPC consegue iniciar uma campanha sem proteção prévia.
+        crate::save_center::create_backup_for_path(&app, &campaign_path)?;
         let mut command = Command::new(install.join("totk.exe"));
         command.current_dir(&install).env("TOTK_PROFILE_DIR", &campaign_path);
         #[cfg(target_os = "windows")]
         { use std::os::windows::process::CommandExt; command.creation_flags(0x08000000); }
-        command.spawn().map_err(|_| "Não foi possível iniciar totk.exe. Verifique a instalação e as permissões.".to_string())?;
+        command.spawn().map_err(|_| "O backup foi concluído, mas não foi possível iniciar totk.exe. Verifique a instalação e as permissões.".to_string())?;
         Ok(())
     }).await.map_err(|_| "Falha ao iniciar o jogo em segundo plano.".to_string())?
 }
