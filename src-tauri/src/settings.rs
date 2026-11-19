@@ -64,7 +64,7 @@ fn validate_settings(settings: &AppSettings) -> Result<(), String> {
     if !matches!(settings.theme.as_str(), "dark" | "light" | "system") {
         return Err("Tema selecionado inválido.".into());
     }
-    if settings.default_folder.len() > 32_000 || settings.default_folder.contains('\0') || settings.last_folder.len() > 32_000 {
+    if settings.default_folder.len() > 32_000 || settings.default_folder.contains('\0') || settings.last_folder.len() > 32_000 || settings.last_folder.contains('\0') {
         return Err("A pasta inicial informada é inválida.".into());
     }
     Ok(())
