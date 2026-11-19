@@ -177,7 +177,7 @@ function Toolbox() {
     try { await navigator.clipboard.writeText(jsonResult); setCopied("json"); window.setTimeout(() => setCopied(""), 1600); }
     catch { setJsonError("Não foi possível copiar para a área de transferência."); }
   };
-  const words = textValue.trim() ? textValue.trim().split(/\\s+/).length : 0;
+  const words = textValue.trim() ? textValue.trim().split(/\s+/).length : 0;
   const copyLabel = (key: string) => copied === key ? <><Check size={14}/> Copiado</> : <><Copy size={14}/> Copiar</>;
   return <section className="toolbox">
     <div className="toolbox-intro"><div className="module-icon"><Type size={21}/></div><div><h3>Ferramentas de texto</h3><p>Utilidades rápidas que funcionam localmente, sem enviar seus dados para a internet.</p></div></div>
@@ -185,11 +185,11 @@ function Toolbox() {
       <article className="tool-card text-tool-card">
         <div className="tool-card-heading"><div><span className="tool-kicker">01 / TEXTO</span><h3>Transformador de texto</h3></div><Type size={18}/></div>
         <textarea value={textValue} onChange={e => setTextValue(e.target.value)} placeholder="Digite ou cole seu texto aqui..." rows={7}/>
-        <div className="text-stats"><span>{words} palavras</span><span>{textValue.length} caracteres</span><span>{textValue.split(/\\n/).length} linhas</span></div>
+        <div className="text-stats"><span>{words} palavras</span><span>{textValue.length} caracteres</span><span>{textValue.split(/\n/).length} linhas</span></div>
         <div className="tool-actions">
           <button onClick={() => void transform(textValue.toUpperCase(),"upper")}>MAIÚSCULAS</button>
           <button onClick={() => void transform(textValue.toLowerCase(),"lower")}>minúsculas</button>
-          <button onClick={() => void transform(textValue.replace(/\\s+/g," ").trim(),"clean")}>Limpar espaços</button>
+          <button onClick={() => void transform(textValue.replace(/\s+/g," ").trim(),"clean")}>Limpar espaços</button>
           <button className="copy-action" onClick={() => void transform(textValue,"text")}>{copyLabel("text")}</button>
         </div>
         {copied === "error" && <small className="tool-error">A área de transferência não está disponível.</small>}
