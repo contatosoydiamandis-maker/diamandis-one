@@ -37,9 +37,18 @@
 - A restauração prepara uma pasta temporária, verifica contagem, tamanho e hashes, preserva o save atual em .diamandis-pre-restore-* e só então troca os diretórios.
 - Backups antigos sem hashes continuam legíveis e usam a verificação estrutural anterior.
 - O diálogo nativo de seleção de pasta evita exigir que a pessoa digite caminhos manualmente.
-- Detecção de jogo em execução, perfis e adaptadores por jogo ainda são etapas futuras.
+- As operações de backup, restauração e gerenciamento de campanhas TOTK usam um lock de processo para impedir concorrência entre mutações.
+- A inicialização de campanha exige backup preventivo no backend antes de criar o processo do jogo.
+
+## Adaptador Zelda: TOTK Recomp
+- Configuração validada pela presença de `totk.exe`.
+- Importação copia `profile` para uma campanha gerenciada e não altera a origem.
+- Campanhas ficam sob `app_local_data_dir/totk-recomp/campaigns`.
+- A inicialização passa `TOTK_PROFILE_DIR` e exige backup preventivo no backend.
+- Backup/restauração de campanha são bloqueados quando `totk.exe` está ativo.
+- A compatibilidade de `TOTK_PROFILE_DIR` ainda depende de validação com a build real do Recomp.
 
 ## Próximos marcos
-- Implementar perfis/campanhas e o adaptador Zelda TOTK Recomp.
-- Adicionar detecção de processos antes de restaurar saves.
-- Gerar lockfiles reproduzíveis e validar o instalador em Windows limpo.
+- Validar o adaptador com uma instalação real do TOTK Recomp.
+- Executar testes físicos de instalação, execução, atualização e remoção em Windows limpo.
+- Versionar lockfiles para builds reproduzíveis.
