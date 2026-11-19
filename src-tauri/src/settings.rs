@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{fs, io::Write, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
 use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,12 +52,17 @@ pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String
     let path = settings_file(&app)?;
     let json = serde_json::to_vec_pretty(&settings)
         .map_err(|_| "Não foi possível preparar as configurações.".to_string())?;
-    let mut file = fs::File::create(path)
-        .map_err(|_| "Não foi possível salvar as configurações no computador.".to_string())?;
-    use std::io::Write;
-    file.write_all(&json)
-        .and_then(|_| file.sync_all())
-        .map_err(|_| "Não foi possível concluir a gravação das configurações.".to_string())
+    let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+    let temp = path.with_file_name(format!("settings-{nonce}.tmp"));
+    let result = (|| -> std::io::Result<()> {
+        let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
+        file.write_all(&json)?;
+        file.sync_all()?;
+        fs::rename(&temp, &path)?;
+        Ok(())
+    })();
+    if result.is_err() { let _ = fs::remove_file(&temp); }
+    result.map_err(|_| "Não foi possível concluir a gravação segura das configurações.".to_string())
 }
 
 fn validate_settings(settings: &AppSettings) -> Result<(), String> {
