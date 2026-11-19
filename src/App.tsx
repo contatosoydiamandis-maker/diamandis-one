@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   AppWindow, ArrowLeft, ArrowUpRight, Boxes, Check, CheckCircle2, ChevronRight, CircleHelp, Copy, Braces, Type,
@@ -139,14 +139,16 @@ function FileManager() {
   const [actionValue, setActionValue] = useState("");
   const [preferences, setPreferences] = useState<Preferences>({theme:"dark",defaultFolder:"",confirmBeforeDelete:true,openLastFolder:false,lastFolder:""});
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const preferencesRef = useRef(preferences);
+  useEffect(() => { preferencesRef.current = preferences; }, [preferences]);
 
   const load = useCallback(async (target?: string) => {
     setBusy(true); setError(""); setSelected(null);
     try {
       const data = await invoke<Listing>("list_directory", { path: target || null });
       setListing(data); setPath(data.path);
-      if (preferences.openLastFolder) {
-        const next = { ...preferences, lastFolder: data.path };
+      if (preferencesRef.current.openLastFolder) {
+        const next = { ...preferencesRef.current, lastFolder: data.path };
         setPreferences(next);
         void invoke("save_settings", { settings: next }).catch(() => {});
       }
@@ -159,6 +161,7 @@ function FileManager() {
     invoke<Preferences>("load_settings").then(settings => {
       if (!active) return;
       setPreferences(settings);
+      preferencesRef.current = settings;
       const initial = settings.openLastFolder && settings.lastFolder ? settings.lastFolder : settings.defaultFolder;
       setSettingsLoaded(true);
       void load(initial || undefined);
