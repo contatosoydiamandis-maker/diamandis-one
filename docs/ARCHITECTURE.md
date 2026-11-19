@@ -38,3 +38,8 @@ src/modules/save-center/adapter.ts define a fronteira de integração. O adaptad
 - Paginar diretórios grandes e evitar bloquear a UI.
 - Integrar o repositório original do Save Manager.
 - Expandir scanners GameHub com fixtures e conectores testados.
+
+
+## Save Center
+
+O Save Center mantém um catálogo local de jogos e caminhos de salvamento em `app_config_dir/save-center/games.json`. Os backups são cópias independentes em `app_local_data_dir/save-center/backups`, organizadas por jogo e identificador. Cada backup registra data, origem, quantidade de arquivos e bytes copiados. Links simbólicos são rejeitados durante a cópia. A restauração prepara uma cópia temporária, confere contagem e tamanho, move o estado atual para uma pasta `.diamandis-pre-restore-*` ao lado do save e só então coloca a versão restaurada no caminho original. Se a troca falhar, o sistema tenta devolver o estado anterior. O primeiro MVP usa caminhos cadastrados manualmente; detecção automática e adaptadores específicos por jogo serão adicionados sem alterar esse formato-base.
