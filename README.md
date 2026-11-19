@@ -2,7 +2,7 @@
 
 **Um hub desktop local-first para Windows:** organização de arquivos, ferramentas de produtividade e gerenciamento da biblioteca gamer em um só lugar.
 
-> **Status: pré-alpha 0.2.0.** A interface desktop inclui navegação real de arquivos, operações controladas, preferências persistentes e detecção inicial de bibliotecas Steam, Epic Games e GOG. O Save Center aguarda a fonte do Save Manager original para integração sem duplicação. Build, instalador e testes Windows ainda precisam de validação automatizada e manual.
+> **Status: pré-alpha 0.2.0.** A interface desktop inclui navegação real de arquivos, operações controladas, preferências persistentes e detecção inicial de bibliotecas Steam, Epic Games e GOG. O Save Center aguarda a fonte do Save Manager original para integração sem duplicação. O frontend e os testes nativos passaram em CI antes da implementação atual do Save Center; a nova implementação está em validação. Instalador e testes físicos ainda precisam de validação manual.
 
 ## Visão do projeto
 
@@ -27,7 +27,7 @@
 | Configurações | Tema escuro/claro/sistema, pasta inicial, confirmação de exclusão e última pasta |
 | Toolbox | Transformador de texto e formatador JSON offline |
 | GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG |
-| Save Center | Contrato de integração criado; aguarda repositório/ZIP do Save Manager existente |
+| Save Center | Cadastro local de jogos, backup por cópia, histórico e restauração protegida; detecção automática por adaptadores ainda em evolução |
 | Dependências | Versões diretas do frontend fixadas; lockfiles reproduzíveis ainda pendentes |
 | Build/instalador | Pipeline preparado; não validado em máquina Windows |
 
