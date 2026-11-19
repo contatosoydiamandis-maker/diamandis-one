@@ -38,6 +38,12 @@ function App() {
   const [search, setSearch] = useState("");
   const [diagnostic, setDiagnostic] = useState("Verificação ainda não executada");
 
+  useEffect(() => {
+    void invoke<{ theme: "dark" | "light" | "system" }>("load_settings")
+      .then(settings => { document.documentElement.dataset.theme = settings.theme; })
+      .catch(() => { document.documentElement.dataset.theme = "dark"; });
+  }, []);
+
   const runDiagnostic = async () => {
     try {
       const result = await invoke<string>("core_diagnostic");
