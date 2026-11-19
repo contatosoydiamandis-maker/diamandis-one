@@ -94,7 +94,12 @@ fn scan_gog(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>) {
 }
 
 #[tauri::command]
-pub fn scan_games() -> Result<Vec<GameEntry>, String> {
+pub async fn scan_games() -> Result<Vec<GameEntry>, String> {
+    tauri::async_runtime::spawn_blocking(scan_games_impl).await
+        .map_err(|_| "Não foi possível concluir a busca de jogos em segundo plano.".to_string())?
+}
+
+fn scan_games_impl() -> Result<Vec<GameEntry>, String> {
     let mut games = Vec::new();
     let mut seen = HashSet::new();
     scan_steam(&mut games, &mut seen);
