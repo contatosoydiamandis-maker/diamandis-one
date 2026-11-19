@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, path::{Path, PathBuf}, process::Command, sync::{Mutex, MutexGuard}, time::{SystemTime, UNIX_EPOCH}};
+use std::{fs, io::Write, path::{Path, PathBuf}, process::Command, sync::{Mutex, MutexGuard}, time::{SystemTime, UNIX_EPOCH}};
 use tauri::{AppHandle, Manager};
 
 static TOTK_OPERATION_LOCK: Mutex<()> = Mutex::new(());
@@ -41,10 +41,18 @@ fn read_config(app: &AppHandle) -> Result<TotkConfig, String> {
 }
 fn write_config(app: &AppHandle, config: &TotkConfig) -> Result<(), String> {
     let path = config_file(app)?;
-    let temp = path.with_extension("tmp");
-    fs::write(&temp, serde_json::to_vec_pretty(config).map_err(|_| "Não foi possível preparar as configurações.".to_string())?)
-        .map_err(|_| "Não foi possível gravar as configurações.".to_string())?;
-    fs::rename(temp, path).map_err(|_| "Não foi possível concluir a gravação das configurações.".to_string())
+    let temp = path.with_file_name(format!("config-{}.tmp", unique_id()));
+    let bytes = serde_json::to_vec_pretty(config)
+        .map_err(|_| "Não foi possível preparar as configurações.".to_string())?;
+    let result = (|| -> std::io::Result<()> {
+        let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
+        file.write_all(&bytes)?;
+        file.sync_all()?;
+        crate::atomic_file::replace(&temp, &path)?;
+        Ok(())
+    })();
+    if result.is_err() { let _ = fs::remove_file(&temp); }
+    result.map_err(|_| "Não foi possível concluir a gravação segura das configurações.".to_string())
 }
 fn validate_install(path: &Path) -> Result<PathBuf, String> {
     let install = path.canonicalize().map_err(|_| "A pasta selecionada não existe ou não pode ser acessada.".to_string())?;
@@ -130,7 +138,7 @@ pub async fn import_totk_profile(app: AppHandle, name: String) -> Result<TotkCam
         if game_running()? { return Err("Feche o TOTK Recomp antes de importar ou alterar campanhas.".into()); }
         let source = install.join("profile");
         if !source.is_dir() { return Err("A pasta profile original não foi encontrada. Nenhuma alteração foi feita.".into()); }
-        let id = stamp();
+        let id = unique_id();
         let destination = root(&app)?.join("campaigns").join(&id);
         if let Some(parent) = destination.parent() { fs::create_dir_all(parent).map_err(|_| "Não foi possível preparar a biblioteca de campanhas.".to_string())?; }
         copy_profile(&source, &destination)?;
