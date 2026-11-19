@@ -7,13 +7,15 @@ type SettingsValue = {
   defaultFolder: string;
   confirmBeforeDelete: boolean;
   openLastFolder: boolean;
+  lastFolder: string;
 };
 
 const defaults: SettingsValue = {
   theme: "dark",
   defaultFolder: "",
   confirmBeforeDelete: true,
-  openLastFolder: false
+  openLastFolder: false,
+  lastFolder: ""
 };
 
 export default function Settings() {
