@@ -1,0 +1,33 @@
+name: Sugerir funcionalidade
+description: Proponha uma melhoria ou novo recurso.
+title: "[FEATURE] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qual problema essa ideia resolve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Como você imagina a solução?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+  - type: dropdown
+    id: module
+    attributes:
+      label: Módulo relacionado
+      options:
+        - Dashboard
+        - File Manager
+        - Toolbox
+        - GameHub
+        - Save Center
+        - Configurações
+        - Outro
