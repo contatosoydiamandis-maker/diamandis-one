@@ -75,9 +75,10 @@ fn copy_file_impl(path: String, destination_folder_path: String) -> Result<(), S
     let mut input = fs::File::open(&source).map_err(|_| "Não foi possível abrir o arquivo de origem.".to_string())?;
     let mut output = fs::OpenOptions::new().write(true).create_new(true).open(&destination)
         .map_err(|_| "Não foi possível criar a cópia no destino. Verifique as permissões e o espaço disponível.".to_string())?;
-    if let Err(_) = std::io::copy(&mut input, &mut output) {
+    if std::io::copy(&mut input, &mut output).is_err() || output.sync_all().is_err() {
+        drop(output);
         let _ = fs::remove_file(&destination);
-        return Err("A cópia foi interrompida. O arquivo incompleto foi removido.".into());
+        return Err("A cópia foi interrompida ou não pôde ser gravada. O arquivo incompleto foi removido.".into());
     }
     Ok(())
 }
