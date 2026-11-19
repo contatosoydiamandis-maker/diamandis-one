@@ -102,6 +102,8 @@ fn game_running() -> Result<bool, String> {
 #[tauri::command]
 pub async fn configure_totk_install(app: AppHandle, install_path: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation_lock()?;
+        if game_running()? { return Err("Feche o TOTK Recomp antes de alterar a instalação configurada.".into()); }
         let install = validate_install(Path::new(&install_path))?;
         let mut config = read_config(&app)?;
         config.install_path = install.to_string_lossy().into_owned();
