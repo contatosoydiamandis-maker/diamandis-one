@@ -107,7 +107,7 @@ mod tests {
         assert!(validate_folder_name("..").is_err());
         assert!(validate_folder_name("../fora").is_err());
         assert!(validate_folder_name("pasta/subpasta").is_err());
-        assert!(validate_folder_name("pasta\\\\subpasta").is_err());
+        assert!(validate_folder_name("pasta\\subpasta").is_err());
         assert!(validate_folder_name("CON").is_err());
         assert!(validate_folder_name("NUL.txt").is_err());
         assert!(validate_folder_name("nome.").is_err());
