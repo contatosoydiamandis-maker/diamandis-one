@@ -218,6 +218,7 @@ pub fn create_backup_for_path(app: &AppHandle, save_path: &Path) -> Result<SaveB
 #[tauri::command]
 pub async fn create_save_backup(app: AppHandle, game_id: String) -> Result<SaveBackup, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = crate::totk_recomp::operation_lock()?;
         let game = find_game(&read_games(&app)?, &game_id)?;
         create_backup_for_game(&app, &game)
     }).await.map_err(|_| "Falha ao criar backup em segundo plano.".to_string())?
@@ -257,6 +258,7 @@ pub async fn list_save_backups(app: AppHandle, game_id: Option<String>) -> Resul
 #[tauri::command]
 pub async fn restore_save_backup(app: AppHandle, backup_id: String, game_id: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = crate::totk_recomp::operation_lock()?;
         if !safe_id(&game_id) || !safe_id(&backup_id) { return Err("Identificador de jogo ou backup inválido.".into()); }
         let game = find_game(&read_games(&app)?, &game_id)?;
         crate::totk_recomp::ensure_campaign_stopped(&app, &game.save_path)?;
