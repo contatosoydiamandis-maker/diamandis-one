@@ -60,7 +60,6 @@ fn friendly_io_error(action: &str, error: &std::io::Error) -> String {
         ErrorKind::PermissionDenied => "o Windows não permitiu o acesso. Verifique as permissões",
         ErrorKind::AlreadyExists => "já existe um item com esse nome",
         ErrorKind::InvalidInput | ErrorKind::InvalidData => "o caminho ou os dados informados são inválidos",
-        ErrorKind::DirectoryNotEmpty => "a pasta não está vazia",
         _ => "ocorreu um erro inesperado",
     };
     format!("Não foi possível {action}: {reason}.")
@@ -80,7 +79,7 @@ fn validate_folder_name(name: &str) -> Result<&str, String> {
         ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\\\' | '|' | '?' | '*')
     });
     if clean.is_empty()
-        || clean.ends_with([' ', '.'])
+        || clean.ends_with(' ') || clean.ends_with('.')
         || invalid_windows_character
         || reserved_device
         || !matches!(candidate.components().next(), Some(Component::Normal(_)))
