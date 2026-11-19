@@ -188,6 +188,13 @@ function FileManager() {
   };
   const openAction = (mode: ActionMode) => {
     if (!selected) return;
+    if (mode === "delete" && !preferences.confirmBeforeDelete) {
+      setError("");
+      void invoke("delete_item", { path: selected.path })
+        .then(() => load(listing?.path))
+        .catch(e => setError(String(e)));
+      return;
+    }
     setAction(mode);
     setActionValue(mode === "rename" ? selected.name : mode === "delete" ? "" : listing?.path ?? "");
   };
