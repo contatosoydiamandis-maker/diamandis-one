@@ -2,89 +2,83 @@
 
 **Um hub desktop local-first para Windows:** organização de arquivos, ferramentas de produtividade e gerenciamento da biblioteca gamer em um só lugar.
 
-> **Status: desenvolvimento ativo (pré-alpha).** A versão 0.1.1 já possui a interface desktop Tauri e um File Manager inicial com navegação real por diretórios e criação de pastas. Toolbox, GameHub e Save Center continuam em implementação. O build Windows e o instalador ainda precisam de validação em máquina Windows.
+> **Status: pré-alpha 0.2.0.** A interface desktop inclui navegação real de arquivos, operações controladas, preferências persistentes e detecção inicial de bibliotecas Steam, Epic Games e GOG. O Save Center aguarda a fonte do Save Manager original para integração sem duplicação. Build, instalador e testes Windows ainda precisam de validação automatizada e manual.
 
 ## Visão do projeto
 
-- **Local-first:** dados e operações devem permanecer no computador do usuário.
+- **Local-first:** dados e operações permanecem no computador do usuário.
 - **Privacidade:** sem anúncios, sem telemetria invasiva e sem conta ou nuvem obrigatória.
 - **Modular:** Dashboard, File Manager, Toolbox, GameHub, Save Center e Configurações.
-- **Seguro:** nenhuma operação destrutiva automática. Alterações futuras em arquivos exigirão pré-visualização, confirmação e registro.
+- **Seguro:** operações destrutivas exigem confirmação e usam a Lixeira; cópias não sobrescrevem arquivos.
 - **Extensível:** conectores independentes para launchers e serviços de jogos.
 
 ## Stack
 
 - React + TypeScript + Vite
 - Tauri 2 + Rust
-- SQLite planejado para persistência local
+- Persistência local em JSON para preferências; SQLite permanece planejado para dados relacionais do GameHub/Save Center.
 
 ## Estado atual
 
 | Área | Estado |
 |---|---|
-| Dashboard e identidade visual | Interface desktop inicial |
-| Navegação modular | Estrutura inicial |
-| Núcleo Rust e diagnóstico | Diagnóstico + comandos de diretório |
-| File Manager | Inicial: navegar diretórios, filtrar itens e criar pastas |
-| Toolbox | Parcial: transformador de texto e formatador JSON offline |
-| GameHub e conectores | Planejado |
-| Save Center | Planejado, aproveitando o Save Manager existente |
-| SQLite e migrações | Planejado |
-| Testes automatizados e instalador | Ainda não validados |
+| Dashboard e identidade visual | Interface desktop com emblema e ícone do instalador |
+| File Manager | Navegação, filtro, criação, renomeação, cópia de arquivos, movimentação e envio à Lixeira |
+| Configurações | Tema escuro/claro/sistema, pasta inicial, confirmação de exclusão e última pasta |
+| Toolbox | Transformador de texto e formatador JSON offline |
+| GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG |
+| Save Center | Contrato de integração criado; aguarda repositório/ZIP do Save Manager existente |
+| Dependências | Versões diretas do frontend fixadas; lockfiles reproduzíveis ainda pendentes |
+| Build/instalador | Pipeline preparado; não validado em máquina Windows |
 
 ## Instalação para usuários
 
-A versão distribuída será instalada por um assistente gráfico do Windows. Usuários finais não precisarão instalar Node.js ou Rust, nem abrir CMD ou PowerShell. Consulte [Instalação e uso](docs/INSTALLATION.md) para conhecer o fluxo planejado e o estado atual da distribuição.
+A versão distribuída será instalada por um assistente gráfico do Windows. Usuários finais não precisarão instalar Node.js ou Rust, nem abrir CMD ou PowerShell. Consulte [Instalação e uso](docs/INSTALLATION.md).
 
-O workflow de instalador pode ser executado manualmente pela aba **Actions** do GitHub ou por uma tag `v*`. Os pacotes gerados ficam como artefatos de teste; tags criam uma Release em rascunho para revisão antes da publicação. Nenhum instalador será considerado estável sem testes reais no Windows.
+O workflow de instalador pode ser executado pela aba **Actions** do GitHub ou por uma tag v*. Os pacotes gerados são artefatos de teste; nenhuma versão será considerada estável sem testes reais em Windows limpo.
 
-## Executar no Windows
+## Desenvolvimento
 
 ### Requisitos
 
 - Windows 10/11
-- Node.js LTS
+- Node.js 22
 - Rust stable com toolchain MSVC
 - Microsoft C++ Build Tools
 - WebView2 Runtime
 
-### Desenvolvimento
+### Comandos para contribuidores
 
-```powershell
+~~~powershell
 npm install
 npm run tauri dev
-```
+~~~
 
-### Build
+Gerar o instalador:
 
-```powershell
+~~~powershell
 npm run tauri build
-```
+~~~
 
-O build e o instalador ainda precisam ser executados e validados em ambiente Windows. Não considere a versão pronta para distribuição até essa validação.
+O comando de build prepara automaticamente o ícone do aplicativo e executa a compilação de produção. Os comandos de terminal pertencem exclusivamente ao desenvolvimento, não à instalação ou ao uso da versão distribuída.
 
 ## Como contribuir
-
-Contribuições são bem-vindas! Antes de começar:
 
 1. Leia [CONTRIBUTING.md](CONTRIBUTING.md).
 2. Consulte as [issues abertas](../../issues).
 3. Para mudanças grandes, abra uma issue para discutir a proposta.
 4. Envie suas alterações por Pull Request.
 
-Use os modelos de issue para reportar bugs e sugerir funcionalidades. Leia também nosso [Código de Conduta](CODE_OF_CONDUCT.md) e a [Política de Segurança](SECURITY.md).
+Use os modelos de issue para reportar bugs e sugerir funcionalidades. Leia também [Código de Conduta](CODE_OF_CONDUCT.md) e [Política de Segurança](SECURITY.md).
 
-## Roadmap inicial
+## Roadmap
 
-1. **0.1:** fundação, navegação e identidade visual.
-2. **0.2:** dashboard e configurações.
-3. **0.3:** File Manager com operações seguras.
-4. **0.4:** Toolbox.
-5. **0.5:** GameHub e descoberta de launchers.
-6. **0.6:** Save Center integrado ao Save Manager existente.
-7. **0.7:** testes, otimização e instalador Windows.
-
-O roadmap pode mudar conforme feedback e contribuições da comunidade.
+1. **0.2:** base desktop, preferências, File Manager seguro e GameHub inicial.
+2. **0.3:** paginação, operações em lote com prévia e testes de filesystem.
+3. **0.4:** Toolbox ampliada.
+4. **0.5:** conectores adicionais de launchers e inicialização de jogos.
+5. **0.6:** integrar o Save Manager existente ao Save Center.
+6. **0.7:** testes completos, otimização, acessibilidade e instalador Windows validado.
 
 ## Licença
 
