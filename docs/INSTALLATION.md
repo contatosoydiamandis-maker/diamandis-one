@@ -18,6 +18,9 @@ A experiência pretendida é:
 
 ## Requisitos da versão distribuída
 
+- A instalação padrão será **somente para o usuário atual**, dentro da pasta de perfil do Windows, evitando solicitar privilégios de administrador sem necessidade.
+- O instalador usará o bootstrapper do WebView2. Se o runtime estiver ausente, será necessário acesso à internet para obtê-lo; o instalador deverá informar claramente qualquer falha nessa etapa.
+
 - Windows 10 ou Windows 11 de 64 bits, conforme a matriz de compatibilidade validada para cada versão.
 - WebView2 Runtime. Em sistemas Windows compatíveis ele normalmente já está presente; o instalador e a documentação deverão orientar o usuário caso seja necessário instalá-lo.
 - Permissão de instalação adequada ao modo escolhido pelo usuário.
@@ -26,7 +29,7 @@ O objetivo é evitar dependências manuais e orientar claramente quando algum co
 
 ## Atualizações e remoção
 
-A distribuição deve oferecer um caminho simples para obter novas versões. A atualização automática dentro do aplicativo só será ativada depois de configurar assinatura criptográfica, publicação e verificação segura dos pacotes.
+A distribuição deve oferecer um caminho simples para obter novas versões. A atualização automática dentro do aplicativo só será ativada depois de configurar assinatura criptográfica, publicação e verificação segura dos pacotes. O instalador de teste será disponibilizado como pré-lançamento e não será promovido a estável sem testes de instalação, atualização, execução e remoção em Windows limpo.
 
 O aplicativo deverá poder ser removido pelo caminho **Configurações do Windows → Aplicativos → Aplicativos instalados**, sem exigir comandos. Dados pessoais, configurações e backups deverão ter política de preservação explícita, sem apagar arquivos do usuário silenciosamente.
 
