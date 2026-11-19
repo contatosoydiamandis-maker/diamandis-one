@@ -169,3 +169,15 @@ pub async fn launch_totk_campaign(app: AppHandle, campaign_id: String) -> Result
 pub async fn is_totk_running() -> Result<bool, String> {
     tauri::async_runtime::spawn_blocking(game_running).await.map_err(|_| "Falha ao consultar o processo do jogo.".to_string())?
 }
+
+pub fn ensure_campaign_stopped(app: &AppHandle, save_path: &str) -> Result<(), String> {
+    let config = read_config(app)?;
+    let candidate = PathBuf::from(save_path).canonicalize().ok();
+    let managed = config.campaigns.iter().any(|campaign| {
+        PathBuf::from(&campaign.path).canonicalize().ok().as_ref() == candidate.as_ref()
+    });
+    if managed && game_running()? {
+        return Err("Feche o TOTK Recomp antes de criar ou restaurar backups desta campanha.".into());
+    }
+    Ok(())
+}

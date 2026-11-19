@@ -176,6 +176,7 @@ fn find_game(games: &[SaveGame], id: &str) -> Result<SaveGame, String> {
 pub async fn create_save_backup(app: AppHandle, game_id: String) -> Result<SaveBackup, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let game = find_game(&read_games(&app)?, &game_id)?;
+        crate::totk_recomp::ensure_campaign_stopped(&app, &game.save_path)?;
         let source = PathBuf::from(&game.save_path).canonicalize().map_err(|_| "A pasta de saves não está mais disponível.".to_string())?;
         if !source.is_dir() { return Err("A origem do save não é uma pasta.".into()); }
         let id = unique_id();
@@ -246,6 +247,7 @@ pub async fn restore_save_backup(app: AppHandle, backup_id: String, game_id: Str
     tauri::async_runtime::spawn_blocking(move || {
         if !safe_id(&game_id) || !safe_id(&backup_id) { return Err("Identificador de jogo ou backup inválido.".into()); }
         let game = find_game(&read_games(&app)?, &game_id)?;
+        crate::totk_recomp::ensure_campaign_stopped(&app, &game.save_path)?;
         let backups = list_backups_impl(&app, Some(game_id.clone()))?;
         let backup = backups.into_iter().find(|b| b.id == backup_id).ok_or_else(|| "Backup não encontrado para este jogo.".to_string())?;
         let target = PathBuf::from(&game.save_path).canonicalize().map_err(|_| "A pasta de destino não está disponível.".to_string())?;
