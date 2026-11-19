@@ -198,3 +198,10 @@ body{
 .file-row:active{background:#30233d}
 @media(max-width:1050px){.file-list-actions{justify-content:flex-start}.file-search{flex:1;min-width:160px}.file-sort{flex:0 0 auto}}
 :root[data-theme="light"] .file-sort{background:#fff;color:#3b3445;border-color:#ded4e8}
+
+.file-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 17px 2px;color:#92889e;font:9px ui-monospace,monospace}
+.file-pagination>div{display:flex;align-items:center;gap:9px}
+.file-pagination strong{color:#c8b4dc;font-size:9px}
+.file-pagination .toolbar-button{min-height:29px;padding:5px 10px;font-size:9px}
+:root[data-theme="light"] .file-pagination strong{color:#5b4a70}
+@media(max-width:700px){.file-pagination{align-items:flex-start;flex-direction:column}.file-pagination>div{width:100%;justify-content:space-between}}
