@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
 type SaveGame = { id: string; name: string; savePath: string; addedAt: string };
-type SaveBackup = { id: string; gameId: string; gameName: string; createdAt: string; sourcePath: string; sizeBytes: number; fileCount: number; backupPath: string };
+type SaveBackup = { id: string; gameId: string; gameName: string; createdAt: string; sourcePath: string; sizeBytes: number; fileCount: number; fileHashes: Record<string, string>; backupPath: string };
 
 const formatSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -131,7 +131,7 @@ export default function SaveCenter() {
           <div className="save-safety-strip"><ShieldCheck size={15}/><span>Backup somente por cópia. Restaurações preservam o estado atual em uma pasta de segurança.</span></div>
           <div className="save-history-heading"><div><h4>Histórico de backups</h4><p>{backups.length} versão(ões) armazenada(s) localmente</p></div><Clock3 size={17}/></div>
           {busy ? <div className="save-empty"><LoaderCircle className="spin" size={22}/><span>Carregando histórico...</span></div> : backups.length ? <div className="save-backup-list">{backups.map(backup => <article className="save-backup-row" key={backup.id}>
-            <div className="save-backup-icon"><Archive size={16}/></div><div className="save-backup-info"><strong>{formatDate(backup.createdAt)}</strong><span>{backup.fileCount} arquivo(s) • {formatSize(backup.sizeBytes)}</span><small>{backup.backupPath}</small></div>
+            <div className="save-backup-icon"><Archive size={16}/></div><div className="save-backup-info"><strong>{formatDate(backup.createdAt)}</strong><span>{backup.fileCount} arquivo(s) • {formatSize(backup.sizeBytes)} • {Object.keys(backup.fileHashes || {}).length ? "SHA-256 verificado" : "Verificação estrutural"}</span><small>{backup.backupPath}</small></div>
             <button className="game-icon-button" title="Restaurar este backup" onClick={() => void restore(backup)} disabled={!!workingId}><RotateCcw size={15}/></button>
           </article>)}</div> : <div className="save-empty compact-empty"><Archive size={22}/><strong>Seu primeiro backup começa aqui</strong><span>Crie uma cópia antes de trocar ou atualizar seus saves.</span></div>}
         </> : !adding && <div className="save-empty save-select-empty"><HardDrive size={28}/><strong>Selecione um jogo</strong><span>Ou cadastre uma pasta de salvamento para começar.</span></div>}

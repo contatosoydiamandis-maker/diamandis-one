@@ -57,8 +57,12 @@ fn read_games(app: &AppHandle) -> Result<Vec<SaveGame>, String> {
     let path = games_file(app)?;
     if !path.exists() { return Ok(Vec::new()); }
     let raw = fs::read_to_string(path).map_err(|_| "Não foi possível ler a biblioteca do Save Center.".to_string())?;
-    serde_json::from_str(&raw).map_err(|_| "O cadastro de jogos está inválido. Seus backups não foram alterados.".to_string())
+    let games: Vec<SaveGame> = serde_json::from_str(&raw).map_err(|_| "O cadastro de jogos está inválido. Seus backups não foram alterados.".to_string())?;
+    if games.iter().any(|game| !safe_id(&game.id)) { return Err("O cadastro contém um identificador inválido. Nenhum caminho de backup foi acessado.".into()); }
+    Ok(games)
 }
+
+fn safe_id(value: &str) -> bool { !value.is_empty() && value.len() <= 40 && value.bytes().all(|byte| byte.is_ascii_digit()) }
 
 fn write_games(app: &AppHandle, games: &[SaveGame]) -> Result<(), String> {
     let path = games_file(app)?;
@@ -215,9 +219,16 @@ fn list_backups_impl(app: &AppHandle, game_id: Option<String>) -> Result<Vec<Sav
         let folder = root.join(&game.id);
         let Ok(entries) = fs::read_dir(folder) else { continue };
         for entry in entries.flatten() {
-            let manifest = entry.path().join("backup.json");
+            let entry_path = entry.path();
+            let Ok(metadata) = fs::symlink_metadata(&entry_path) else { continue };
+            if !metadata.is_dir() || metadata.file_type().is_symlink() { continue; }
+            let folder_id = entry.file_name().to_string_lossy().into_owned();
+            if !safe_id(&folder_id) { continue; }
+            let manifest = entry_path.join("backup.json");
             let Ok(raw) = fs::read_to_string(manifest) else { continue };
-            if let Ok(backup) = serde_json::from_str::<SaveBackup>(&raw) { backups.push(backup); }
+            if let Ok(backup) = serde_json::from_str::<SaveBackup>(&raw) {
+                if safe_id(&backup.id) && backup.id == folder_id && backup.game_id == game.id { backups.push(backup); }
+            }
         }
     }
     backups.sort_by(|a, b| b.created_at.cmp(&a.created_at));
@@ -233,6 +244,7 @@ pub async fn list_save_backups(app: AppHandle, game_id: Option<String>) -> Resul
 #[tauri::command]
 pub async fn restore_save_backup(app: AppHandle, backup_id: String, game_id: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        if !safe_id(&game_id) || !safe_id(&backup_id) { return Err("Identificador de jogo ou backup inválido.".into()); }
         let game = find_game(&read_games(&app)?, &game_id)?;
         let backups = list_backups_impl(&app, Some(game_id.clone()))?;
         let backup = backups.into_iter().find(|b| b.id == backup_id).ok_or_else(|| "Backup não encontrado para este jogo.".to_string())?;
