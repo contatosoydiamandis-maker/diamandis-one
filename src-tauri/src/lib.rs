@@ -41,11 +41,15 @@ fn list_directory_impl(path: Option<String>, offset: usize, limit: usize) -> Res
     if !canonical.is_dir() { return Err("O caminho informado não é uma pasta.".into()); }
     let iterator = fs::read_dir(&canonical).map_err(|e| friendly_io_error("listar esta pasta", &e))?;
     let mut candidates = Vec::new();
-    for item in iterator {
-        let item = item.map_err(|e| friendly_io_error("ler um item desta pasta", &e))?;
+    for item in iterator.flatten() {
         let item_path = item.path();
-        let file_type = item.file_type().map_err(|e| friendly_io_error("identificar um item desta pasta", &e))?;
-        candidates.push((item.file_name().to_string_lossy().to_string(), item_path, file_type.is_dir(), file_type.is_symlink()));
+        let file_type = item.file_type().ok();
+        candidates.push((
+            item.file_name().to_string_lossy().to_string(),
+            item_path,
+            file_type.as_ref().map(|kind| kind.is_dir()).unwrap_or(false),
+            file_type.as_ref().map(|kind| kind.is_symlink()).unwrap_or(false),
+        ));
     }
     candidates.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())));
     let total = candidates.len();
