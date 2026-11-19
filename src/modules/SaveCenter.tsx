@@ -77,9 +77,8 @@ export default function SaveCenter() {
     setTotkBusy(true); setError(""); setNotice("");
     try { let game = games.find(item => item.savePath === campaign.path);
       if (!game) game = await invoke<SaveGame>("add_save_game", { name: "TOTK Recomp • " + campaign.name, savePath: campaign.path });
-      const backup = await invoke<SaveBackup>("create_save_backup", { gameId: game.id });
-      await invoke("launch_totk_campaign", { campaignId: campaign.id });
-      setNotice("Backup preventivo concluído (" + backup.fileCount + " arquivo(s)). Campanha iniciada."); await refreshTotk(); await refresh(game.id);
+      const backup = await invoke<SaveBackup>("launch_totk_campaign", { campaignId: campaign.id });
+      setNotice("Backup preventivo verificado (" + backup.fileCount + " arquivo(s)). Campanha iniciada."); await refreshTotk(); await refresh(game.id);
     } catch (e) { setError(String(e)); } finally { setTotkBusy(false); }
   };
 
