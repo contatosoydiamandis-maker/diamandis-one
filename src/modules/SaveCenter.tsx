@@ -53,7 +53,7 @@ export default function SaveCenter() {
   }, []);
 
   const refreshTotk = useCallback(async () => {
-    try { const [campaigns, running] = await Promise.all([invoke<TotkCampaign[]>("list_totk_campaigns"), invoke<boolean>("is_totk_running")]); setTotkCampaigns(campaigns); setTotkRunning(running); }
+    try { const [campaigns, running, install] = await Promise.all([invoke<TotkCampaign[]>("list_totk_campaigns"), invoke<boolean>("is_totk_running"), invoke<string>("get_totk_install")]); setTotkCampaigns(campaigns); setTotkRunning(running); setTotkInstall(install); }
     catch (e) { setError(String(e)); }
   }, []);
 

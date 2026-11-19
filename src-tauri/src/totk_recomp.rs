@@ -104,6 +104,11 @@ pub async fn configure_totk_install(app: AppHandle, install_path: String) -> Res
     }).await.map_err(|_| "Falha ao validar a instalação em segundo plano.".to_string())?
 }
 #[tauri::command]
+pub async fn get_totk_install(app: AppHandle) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || Ok(read_config(&app)?.install_path))
+        .await.map_err(|_| "Falha ao carregar a instalação configurada.".to_string())?
+}
+#[tauri::command]
 pub async fn list_totk_campaigns(app: AppHandle) -> Result<Vec<TotkCampaign>, String> {
     tauri::async_runtime::spawn_blocking(move || Ok(read_config(&app)?.campaigns)).await.map_err(|_| "Falha ao carregar campanhas.".to_string())?
 }
