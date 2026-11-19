@@ -121,14 +121,14 @@ mod tests {
 
     #[test]
     fn accepts_normal_windows_names() {
-        assert_eq!(valid_name("My saves").unwrap(), "My saves");
-        assert_eq!(valid_name("Save_2026").unwrap(), "Save_2026");
+        assert_eq!(validate_name("My saves").unwrap(), "My saves");
+        assert_eq!(validate_name("Save_2026").unwrap(), "Save_2026");
     }
 
     #[test]
     fn rejects_paths_reserved_names_and_invalid_characters() {
         for name in ["", " ", "..", "../outside", "folder\\\\child", "CON", "NUL.txt", "COM1", "LPT9.log", "NUL .txt", "CONOUT$", "COM¹", "bad?.txt", "trailing."] {
-            assert!(valid_name(name).is_err(), "name should be rejected: {name}");
+            assert!(validate_name(name).is_err(), "name should be rejected: {name}");
         }
     }
 }
