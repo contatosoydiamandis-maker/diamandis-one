@@ -44,16 +44,45 @@ fn list_directory(path: Option<String>) -> Result<DirectoryListing, String> {
 
 #[tauri::command]
 fn create_directory(parent: String, name: String) -> Result<(), String> {
-    let name = name.trim();
-    let relative = Path::new(name);
-    if name.is_empty() || !matches!(relative.components().next(), Some(Component::Normal(_))) || relative.components().count() != 1 {
-        return Err("Informe um nome de pasta válido, sem caminhos.".into());
-    }
+    let name = validate_folder_name(&name)?;
     let parent = PathBuf::from(parent).canonicalize().map_err(|e| format!("Não foi possível acessar o destino: {e}"))?;
     if !parent.is_dir() { return Err("O destino informado não é uma pasta.".into()); }
     let destination = parent.join(name);
     if destination.exists() { return Err("Já existe um item com esse nome.".into()); }
     fs::create_dir(destination).map_err(|e| format!("Não foi possível criar a pasta: {e}"))
+}
+
+
+fn validate_folder_name(name: &str) -> Result<&str, String> {
+    let clean = name.trim();
+    let candidate = Path::new(clean);
+    if clean.is_empty()
+        || !matches!(candidate.components().next(), Some(Component::Normal(_)))
+        || candidate.components().count() != 1
+    {
+        return Err("Informe um nome de pasta válido, sem caminhos.".into());
+    }
+    Ok(clean)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_folder_name;
+
+    #[test]
+    fn accepts_simple_folder_names() {
+        assert_eq!(validate_folder_name("Minhas imagens").unwrap(), "Minhas imagens");
+        assert_eq!(validate_folder_name("  Projetos  ").unwrap(), "Projetos");
+    }
+
+    #[test]
+    fn rejects_empty_and_traversal_names() {
+        assert!(validate_folder_name("").is_err());
+        assert!(validate_folder_name("   ").is_err());
+        assert!(validate_folder_name("..").is_err());
+        assert!(validate_folder_name("../fora").is_err());
+        assert!(validate_folder_name("pasta/subpasta").is_err());
+    }
 }
 
 fn home_dir() -> PathBuf {
