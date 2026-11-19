@@ -247,3 +247,6 @@ body{
 :root[data-theme="light"] .save-center-hero h3{color:#30263d}
 @media(max-width:850px){.save-center-layout{grid-template-columns:1fr}.save-games-panel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.save-add-toggle{grid-column:1/-1}.save-selected-heading{align-items:flex-start;flex-direction:column}.save-selected-heading code{max-width:75vw}}
 @media(max-width:520px){.save-games-panel{grid-template-columns:1fr}.save-center-toolbar{align-items:flex-start;flex-direction:column}.save-center-total{display:none}}
+
+.save-path-picker{display:flex;align-items:center;gap:8px}.save-path-picker input{flex:1;min-width:0}.save-path-picker .secondary-button{flex-shrink:0;white-space:nowrap}
+@media(max-width:520px){.save-path-picker{align-items:stretch;flex-direction:column}.save-path-picker .secondary-button{justify-content:center}}
