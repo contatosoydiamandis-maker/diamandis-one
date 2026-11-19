@@ -2,6 +2,8 @@
 
 ## Para quem vai usar o aplicativo
 
+O pacote só será promovido a estável depois de passar pelo [checklist de qualidade para releases](RELEASE-CHECKLIST.md).
+
 A distribuição oficial do DIAMANDIS ONE será feita por um instalador gráfico para Windows (`.exe`).
 
 A experiência pretendida é:
