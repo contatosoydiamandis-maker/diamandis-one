@@ -184,3 +184,28 @@ pub fn ensure_campaign_stopped(app: &AppHandle, save_path: &str) -> Result<(), S
     }
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::safe_name;
+
+    #[test]
+    fn accepts_normal_campaign_names() {
+        assert_eq!(safe_name("Principal 100%").unwrap(), "Principal 100%");
+        assert_eq!(safe_name("Campanha - Sem glitches").unwrap(), "Campanha - Sem glitches");
+    }
+
+    #[test]
+    fn rejects_empty_or_unsafe_campaign_names() {
+        for value in ["", "   ", "../fora", "C:\\temp", "nome|invalido", "nome?"] {
+            assert!(safe_name(value).is_err(), "nome inseguro aceito: {value}");
+        }
+    }
+
+    #[test]
+    fn trims_campaign_names_and_enforces_length() {
+        assert_eq!(safe_name("  Principal  ").unwrap(), "Principal");
+        assert!(safe_name(&"a".repeat(81)).is_err());
+    }
+}
