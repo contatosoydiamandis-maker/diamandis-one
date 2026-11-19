@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  AppWindow, ArrowLeft, ArrowUpRight, Boxes, CheckCircle2, ChevronRight, CircleHelp,
+  AppWindow, ArrowLeft, ArrowUpRight, Boxes, Check, CheckCircle2, ChevronRight, CircleHelp, Copy, Braces, Type,
   Clock3, Command, File, FileSearch, Folder, FolderKanban, FolderPlus, Gamepad2, HardDrive,
   Image, LayoutDashboard, LoaderCircle, RefreshCw, Search, Settings2, ShieldCheck, Sparkles,
   Wrench, Zap
@@ -110,7 +110,7 @@ function App() {
               <div className="status-card"><div className="status-icon"><ShieldCheck size={18}/></div><div><span>PRIVACIDADE</span><strong>Controle local</strong><small>Sem telemetria invasiva</small></div></div>
               <button className="status-card diagnostic-card" onClick={runDiagnostic}><div className="status-icon"><AppWindow size={18}/></div><div><span>DIAGNÓSTICO DO CORE</span><strong>Executar verificação <ArrowUpRight size={13}/></strong><small>{diagnostic}</small></div></button>
             </section>
-          </> : active === "files" ? <FileManager/> : <ModulePlaceholder id={active} onBack={() => setActive("overview")}/>}
+          </> : active === "files" ? <FileManager/> : active === "toolbox" ? <Toolbox/> : <ModulePlaceholder id={active} onBack={() => setActive("overview")}/>}
           <footer><span>DIAMANDIS ONE <b>•</b> BUILT FOR YOUR DESKTOP</span><span><Clock3 size={12}/> VERSÃO DE FUNDAÇÃO 0.1.0</span></footer>
         </div>
       </main>
@@ -154,6 +154,55 @@ function FileManager() {
     <div className="file-table"><div className="file-table-head"><span>NOME</span><span>TIPO</span><span>TAMANHO</span></div>
       {busy ? <div className="file-empty"><LoaderCircle className="spin" size={24}/><strong>Carregando pasta...</strong></div> : visible.length ? visible.map(item => <button className="file-row" key={item.path} onClick={() => item.isDir && void load(item.path)}><span className="file-name">{item.isDir ? <Folder size={18} className="folder-color"/> : <File size={17}/>}<strong>{item.name}</strong></span><span>{item.isDir ? "Pasta" : "Arquivo"}</span><span>{size(item.size)}</span></button>) : <div className="file-empty"><Folder size={25}/><strong>{filter ? "Nenhum resultado" : "Esta pasta está vazia"}</strong><span>Os itens desta localização aparecerão aqui.</span></div>}
     </div><div className="file-manager-foot"><ShieldCheck size={14}/> Navegação e criação de pastas. Nenhum arquivo será removido ou sobrescrito.</div>
+  </section>;
+}
+
+
+function Toolbox() {
+  const [textValue, setTextValue] = useState("");
+  const [jsonValue, setJsonValue] = useState("");
+  const [jsonResult, setJsonResult] = useState("");
+  const [jsonError, setJsonError] = useState("");
+  const [copied, setCopied] = useState("");
+  const transform = async (value: string, key: string) => {
+    setTextValue(value);
+    try { await navigator.clipboard.writeText(value); setCopied(key); window.setTimeout(() => setCopied(""), 1600); }
+    catch { setCopied("error"); }
+  };
+  const formatJson = () => {
+    try { setJsonResult(JSON.stringify(JSON.parse(jsonValue), null, 2)); setJsonError(""); }
+    catch (e) { setJsonResult(""); setJsonError(e instanceof Error ? e.message : "JSON inválido."); }
+  };
+  const copyJson = async () => {
+    try { await navigator.clipboard.writeText(jsonResult); setCopied("json"); window.setTimeout(() => setCopied(""), 1600); }
+    catch { setJsonError("Não foi possível copiar para a área de transferência."); }
+  };
+  const words = textValue.trim() ? textValue.trim().split(/\\s+/).length : 0;
+  const copyLabel = (key: string) => copied === key ? <><Check size={14}/> Copiado</> : <><Copy size={14}/> Copiar</>;
+  return <section className="toolbox">
+    <div className="toolbox-intro"><div className="module-icon"><Type size={21}/></div><div><h3>Ferramentas de texto</h3><p>Utilidades rápidas que funcionam localmente, sem enviar seus dados para a internet.</p></div></div>
+    <div className="toolbox-grid">
+      <article className="tool-card text-tool-card">
+        <div className="tool-card-heading"><div><span className="tool-kicker">01 / TEXTO</span><h3>Transformador de texto</h3></div><Type size={18}/></div>
+        <textarea value={textValue} onChange={e => setTextValue(e.target.value)} placeholder="Digite ou cole seu texto aqui..." rows={7}/>
+        <div className="text-stats"><span>{words} palavras</span><span>{textValue.length} caracteres</span><span>{textValue.split(/\\n/).length} linhas</span></div>
+        <div className="tool-actions">
+          <button onClick={() => void transform(textValue.toUpperCase(),"upper")}>MAIÚSCULAS</button>
+          <button onClick={() => void transform(textValue.toLowerCase(),"lower")}>minúsculas</button>
+          <button onClick={() => void transform(textValue.replace(/\\s+/g," ").trim(),"clean")}>Limpar espaços</button>
+          <button className="copy-action" onClick={() => void transform(textValue,"text")}>{copyLabel("text")}</button>
+        </div>
+        {copied === "error" && <small className="tool-error">A área de transferência não está disponível.</small>}
+      </article>
+      <article className="tool-card json-tool-card">
+        <div className="tool-card-heading"><div><span className="tool-kicker">02 / DESENVOLVIMENTO</span><h3>Formatador JSON</h3></div><Braces size={18}/></div>
+        <textarea value={jsonValue} onChange={e => setJsonValue(e.target.value)} placeholder={'Cole seu JSON aqui...'} rows={5}/>
+        <div className="tool-actions"><button className="primary-button compact" onClick={formatJson} disabled={!jsonValue.trim()}>Formatar JSON</button><button onClick={() => {setJsonValue("");setJsonResult("");setJsonError("");}}>Limpar</button></div>
+        {jsonError && <div className="tool-error">{jsonError}</div>}
+        {jsonResult && <div className="json-output"><div><span>RESULTADO FORMATADO</span><button onClick={() => void copyJson()}>{copyLabel("json")}</button></div><pre>{jsonResult}</pre></div>}
+      </article>
+    </div>
+    <div className="toolbox-note"><ShieldCheck size={15}/> Todo o processamento acontece no próprio aplicativo. Nada é enviado para servidores.</div>
   </section>;
 }
 
