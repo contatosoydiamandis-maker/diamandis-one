@@ -4,6 +4,8 @@ Esta lista é obrigatória antes de promover qualquer build para uma versão est
 
 ## 1. Integração contínua
 
+- [ ] `package-lock.json` e `Cargo.lock` versionados para instalações reproduzíveis.
+- [ ] CI utiliza `npm ci` e comandos Cargo com `--locked` assim que os lockfiles forem adicionados.
 - [ ] Build de produção do frontend concluído sem erros.
 - [ ] Testes Rust concluídos sem falhas.
 - [ ] Instalador NSIS gerado no Windows x64.
