@@ -94,3 +94,21 @@ pub fn delete_item(path: String) -> Result<(), String> {
     trash::delete(&target)
         .map_err(|_| "O Windows não conseguiu enviar este item para a Lixeira. Nada foi excluído permanentemente.".into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::valid_name;
+
+    #[test]
+    fn accepts_normal_windows_names() {
+        assert_eq!(valid_name("My saves").unwrap(), "My saves");
+        assert_eq!(valid_name("Save_2026").unwrap(), "Save_2026");
+    }
+
+    #[test]
+    fn rejects_paths_reserved_names_and_invalid_characters() {
+        for name in ["", " ", "..", "../outside", "folder\\\\child", "CON", "NUL.txt", "COM1", "LPT9.log", "bad?.txt", "trailing."] {
+            assert!(valid_name(name).is_err(), "name should be rejected: {name}");
+        }
+    }
+}
