@@ -33,13 +33,13 @@
 - O catálogo inicial fica em app_local_data_dir/save-center/games.json.
 - Backups ficam em app_local_data_dir/save-center/backups/<game-id>/<backup-id>.
 - O MVP permite cadastrar qualquer pasta existente, sem modificar seu conteúdo.
-- A criação de backup copia arquivos e rejeita links simbólicos.
-- A restauração prepara uma pasta temporária, verifica contagem e tamanho, preserva o save atual em .diamandis-pre-restore-* e só então troca os diretórios.
+- A criação de backup copia arquivos, rejeita links simbólicos e grava hashes SHA-256 por arquivo.
+- A restauração prepara uma pasta temporária, verifica contagem, tamanho e hashes, preserva o save atual em .diamandis-pre-restore-* e só então troca os diretórios.
+- Backups antigos sem hashes continuam legíveis e usam a verificação estrutural anterior.
 - O diálogo nativo de seleção de pasta evita exigir que a pessoa digite caminhos manualmente.
-- Hashes criptográficos, detecção de jogo em execução, perfis e adaptadores por jogo ainda são etapas futuras.
+- Detecção de jogo em execução, perfis e adaptadores por jogo ainda são etapas futuras.
 
 ## Próximos marcos
-- Acrescentar hashes SHA-256 por arquivo e testes de corrupção.
 - Implementar perfis/campanhas e o adaptador Zelda TOTK Recomp.
 - Adicionar detecção de processos antes de restaurar saves.
 - Gerar lockfiles reproduzíveis e validar o instalador em Windows limpo.

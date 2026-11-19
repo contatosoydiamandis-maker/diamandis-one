@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, io, path::{Path, PathBuf}, time::{SystemTime, UNIX_EPOCH}};
+use sha2::{Digest, Sha256};
+use std::{collections::BTreeMap, fs, io::{self, Read, Write}, path::{Path, PathBuf}, time::{SystemTime, UNIX_EPOCH}};
 use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +22,8 @@ pub struct SaveBackup {
     pub source_path: String,
     pub size_bytes: u64,
     pub file_count: u64,
+    #[serde(default)]
+    pub file_hashes: BTreeMap<String, String>,
     pub backup_path: String,
 }
 
@@ -59,10 +62,17 @@ fn read_games(app: &AppHandle) -> Result<Vec<SaveGame>, String> {
 
 fn write_games(app: &AppHandle, games: &[SaveGame]) -> Result<(), String> {
     let path = games_file(app)?;
+    let temp = path.with_extension(format!("{}.tmp", unique_id()));
     let bytes = serde_json::to_vec_pretty(games).map_err(|_| "Não foi possível preparar o cadastro.".to_string())?;
-    let mut file = fs::File::create(&path).map_err(|_| "Não foi possível gravar o cadastro de jogos.".to_string())?;
-    use std::io::Write;
-    file.write_all(&bytes).and_then(|_| file.sync_all()).map_err(|_| "Não foi possível concluir a atualização do cadastro.".to_string())
+    let result = (|| -> io::Result<()> {
+        let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
+        file.write_all(&bytes)?;
+        file.sync_all()?;
+        fs::rename(&temp, &path)?;
+        Ok(())
+    })();
+    if result.is_err() { let _ = fs::remove_file(&temp); }
+    result.map_err(|_| "Não foi possível concluir a atualização segura do cadastro de jogos.".to_string())
 }
 
 #[tauri::command]
@@ -121,6 +131,39 @@ fn copy_tree(source: &Path, destination: &Path, stats: &mut (u64, u64)) -> io::R
     Ok(())
 }
 
+fn collect_hashes(root: &Path) -> io::Result<BTreeMap<String, String>> {
+    fn visit(root: &Path, current: &Path, hashes: &mut BTreeMap<String, String>) -> io::Result<()> {
+        for entry in fs::read_dir(current)? {
+            let entry = entry?;
+            let path = entry.path();
+            let metadata = fs::symlink_metadata(&path)?;
+            if metadata.file_type().is_symlink() {
+                return Err(io::Error::new(io::ErrorKind::InvalidInput, "link simbólico encontrado durante a verificação"));
+            }
+            if metadata.is_dir() {
+                visit(root, &path, hashes)?;
+            } else if metadata.is_file() {
+                let relative = path.strip_prefix(root)
+                    .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "caminho fora da raiz"))?
+                    .to_string_lossy().replace('\\', "/");
+                let mut file = fs::File::open(&path)?;
+                let mut hasher = Sha256::new();
+                let mut buffer = [0u8; 64 * 1024];
+                loop {
+                    let read = file.read(&mut buffer)?;
+                    if read == 0 { break; }
+                    hasher.update(&buffer[..read]);
+                }
+                hashes.insert(relative, format!("{:x}", hasher.finalize()));
+            }
+        }
+        Ok(())
+    }
+    let mut hashes = BTreeMap::new();
+    visit(root, root, &mut hashes)?;
+    Ok(hashes)
+}
+
 fn find_game(games: &[SaveGame], id: &str) -> Result<SaveGame, String> {
     games.iter().find(|g| g.id == id).cloned().ok_or_else(|| "Jogo não encontrado no Save Center.".into())
 }
@@ -136,15 +179,23 @@ pub async fn create_save_backup(app: AppHandle, game_id: String) -> Result<SaveB
         fs::create_dir_all(&root).map_err(|_| "Não foi possível criar a pasta do jogo.".to_string())?;
         let destination = root.join(&id);
         fs::create_dir_all(&destination).map_err(|_| "Não foi possível iniciar o backup.".to_string())?;
+        let payload = destination.join("payload");
         let mut stats = (0u64, 0u64);
-        if let Err(error) = copy_tree(&source, &destination.join("payload"), &mut stats) {
+        if let Err(error) = copy_tree(&source, &payload, &mut stats) {
             let _ = fs::remove_dir_all(&destination);
             return Err(format!("Backup cancelado: {}. Nenhum arquivo original foi alterado.", error));
         }
+        let file_hashes = match collect_hashes(&payload) {
+            Ok(hashes) => hashes,
+            Err(error) => {
+                let _ = fs::remove_dir_all(&destination);
+                return Err(format!("Não foi possível verificar a integridade do backup: {error}"));
+            }
+        };
         let backup = SaveBackup {
             id, game_id: game.id, game_name: game.name, created_at: stamp(),
             source_path: source.to_string_lossy().into_owned(), size_bytes: stats.0,
-            file_count: stats.1, backup_path: destination.to_string_lossy().into_owned(),
+            file_count: stats.1, file_hashes, backup_path: destination.to_string_lossy().into_owned(),
         };
         let manifest = serde_json::to_vec_pretty(&backup).map_err(|_| "Não foi possível preparar os dados do backup.".to_string())?;
         if let Err(error) = fs::write(destination.join("backup.json"), manifest) {
@@ -191,32 +242,49 @@ pub async fn restore_save_backup(app: AppHandle, backup_id: String, game_id: Str
         let payload = backup_dir.join("payload");
         if !payload.is_dir() { return Err("O conteúdo deste backup está incompleto.".into()); }
         let parent = target.parent().ok_or_else(|| "Não foi possível determinar a pasta pai do save.".to_string())?;
-        let stage = parent.join(format!(".diamandis-restore-{}", stamp()));
-        let safety = parent.join(format!(".diamandis-pre-restore-{}", stamp()));
+        let stage = parent.join(format!(".diamandis-restore-{}", unique_id()));
+        let safety = parent.join(format!(".diamandis-pre-restore-{}", unique_id()));
         let mut stats = (0u64, 0u64);
         copy_tree(&payload, &stage, &mut stats).map_err(|e| { let _ = fs::remove_dir_all(&stage); format!("Não foi possível preparar a restauração: {e}") })?;
         if stats.0 != backup.size_bytes || stats.1 != backup.file_count {
             let _ = fs::remove_dir_all(&stage);
-            return Err("A verificação do backup falhou. O save atual permaneceu intacto.".into());
+            return Err("A verificação estrutural do backup falhou. O save atual permaneceu intacto.".into());
+        }
+        if !backup.file_hashes.is_empty() || backup.file_count == 0 {
+            let restored_hashes = collect_hashes(&stage).map_err(|e| {
+                let _ = fs::remove_dir_all(&stage);
+                format!("Não foi possível verificar os arquivos preparados: {e}")
+            })?;
+            if restored_hashes != backup.file_hashes {
+                let _ = fs::remove_dir_all(&stage);
+                return Err("A verificação SHA-256 falhou. O backup pode estar corrompido; o save atual permaneceu intacto.".into());
+            }
         }
         fs::rename(&target, &safety).map_err(|e| { let _ = fs::remove_dir_all(&stage); format!("Não foi possível proteger o save atual antes da restauração: {e}") })?;
         if let Err(error) = fs::rename(&stage, &target) {
-            let _ = fs::rename(&safety, &target);
+            let rollback = fs::rename(&safety, &target);
             let _ = fs::remove_dir_all(&stage);
-            return Err(format!("Restauração não concluída. Tentamos devolver o save original ao local: {error}"));
+            return Err(match rollback {
+                Ok(()) => format!("Restauração não concluída. O save original foi devolvido ao local: {error}"),
+                Err(rollback_error) => format!("Falha crítica na restauração ({error}). O save original permanece preservado em {}. Falha ao recolocá-lo automaticamente: {rollback_error}", safety.to_string_lossy()),
+            });
         }
-        Ok(format!("Save restaurado. O estado anterior foi preservado em: {}", safety.to_string_lossy()))
+        Ok(format!("Save restaurado e verificado. O estado anterior foi preservado em: {}", safety.to_string_lossy()))
     }).await.map_err(|_| "Falha ao restaurar backup em segundo plano.".to_string())?
 }
 
 #[cfg(test)]
 mod tests {
-    use super::copy_tree;
+    use super::{collect_hashes, copy_tree};
     use std::{fs, time::{SystemTime, UNIX_EPOCH}};
+
+    fn temp_root() -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("diamandis-save-test-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()))
+    }
 
     #[test]
     fn copies_nested_save_files_and_counts_bytes() {
-        let root = std::env::temp_dir().join(format!("diamandis-save-test-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let root = temp_root();
         let source = root.join("source");
         let target = root.join("target");
         fs::create_dir_all(source.join("nested")).unwrap();
@@ -225,6 +293,19 @@ mod tests {
         copy_tree(&source, &target, &mut stats).unwrap();
         assert_eq!(fs::read(target.join("nested/save.dat")).unwrap(), b"save-data");
         assert_eq!(stats, (9, 1));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn sha256_manifest_detects_modified_backup_file() {
+        let root = temp_root();
+        let payload = root.join("payload");
+        fs::create_dir_all(&payload).unwrap();
+        fs::write(payload.join("slot.dat"), b"original-save").unwrap();
+        let original = collect_hashes(&payload).unwrap();
+        fs::write(payload.join("slot.dat"), b"modified-save").unwrap();
+        let changed = collect_hashes(&payload).unwrap();
+        assert_ne!(original, changed);
         fs::remove_dir_all(root).unwrap();
     }
 }
