@@ -9,8 +9,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend:
+    name: Frontend typecheck and production build
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -19,40 +24,23 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
       - name: Build frontend
         run: npm run build
 
   rust:
+    name: Native core tests
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Check native core
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - name: Run native core tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
-
-  desktop-installer:
-    runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Install frontend dependencies
-        run: npm install
-      - name: Build Windows installer
-        run: npm run tauri build
-      - name: Upload Windows installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: DIAMANDIS-ONE-Windows-Installer
-          path: src-tauri/target/release/bundle/nsis/*.exe
-          if-no-files-found: error
-          retention-days: 14
