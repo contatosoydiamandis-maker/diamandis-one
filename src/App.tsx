@@ -82,7 +82,7 @@ function App() {
       <main className="main-area">
         <header className="topbar">
           <div className="breadcrumb"><span>DIAMANDIS ONE</span><ChevronRight size={13}/><strong>{current.title}</strong></div>
-          <div className="top-actions"><span className="system-status"><i/> SISTEMA PRONTO</span><button className="icon-button" title="Ajuda"><CircleHelp size={17}/></button><div className="avatar">D</div></div>
+          <div className="top-actions"><span className="system-status"><i/> PRÉ-ALPHA • EM DESENVOLVIMENTO</span><button className="icon-button" title="Ajuda"><CircleHelp size={17}/></button><div className="avatar">D</div></div>
         </header>
 
         <div className="content">
@@ -111,7 +111,7 @@ function App() {
               <button className="status-card diagnostic-card" onClick={runDiagnostic}><div className="status-icon"><AppWindow size={18}/></div><div><span>DIAGNÓSTICO DO CORE</span><strong>Executar verificação <ArrowUpRight size={13}/></strong><small>{diagnostic}</small></div></button>
             </section>
           </> : active === "files" ? <FileManager/> : active === "toolbox" ? <Toolbox/> : <ModulePlaceholder id={active} onBack={() => setActive("overview")}/>}
-          <footer><span>DIAMANDIS ONE <b>•</b> BUILT FOR YOUR DESKTOP</span><span><Clock3 size={12}/> VERSÃO DE FUNDAÇÃO 0.1.0</span></footer>
+          <footer><span>DIAMANDIS ONE <b>•</b> BUILT FOR YOUR DESKTOP</span><span><Clock3 size={12}/> PRÉ-ALPHA 0.1.1</span></footer>
         </div>
       </main>
     </div>
