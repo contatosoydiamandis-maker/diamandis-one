@@ -75,7 +75,7 @@ function App() {
 
         <div className="sidebar-bottom">
           <div className="local-card"><div className="local-icon"><ShieldCheck size={17} /></div><div><strong>Local-first</strong><span>Seus dados ficam no seu PC</span></div><CheckCircle2 size={14} className="local-check" /></div>
-          <div className="version">DIAMANDIS ONE <span>v0.1.0</span></div>
+          <div className="version">DIAMANDIS ONE <span>v0.1.1</span></div>
         </div>
       </aside>
 
