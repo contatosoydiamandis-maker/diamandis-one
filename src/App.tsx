@@ -9,6 +9,9 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import type { ModuleId } from "./types";
+import GameHub from "./modules/GameHub";
+import Settings from "./modules/Settings";
+import SaveCenter from "./modules/SaveCenter";
 
 type NavItem = { id: ModuleId; label: string; icon: LucideIcon; group: string };
 
@@ -110,7 +113,7 @@ function App() {
               <div className="status-card"><div className="status-icon"><ShieldCheck size={18}/></div><div><span>PRIVACIDADE</span><strong>Controle local</strong><small>Sem telemetria invasiva</small></div></div>
               <button className="status-card diagnostic-card" onClick={runDiagnostic}><div className="status-icon"><AppWindow size={18}/></div><div><span>DIAGNÓSTICO DO CORE</span><strong>Executar verificação <ArrowUpRight size={13}/></strong><small>{diagnostic}</small></div></button>
             </section>
-          </> : active === "files" ? <FileManager/> : active === "toolbox" ? <Toolbox/> : <ModulePlaceholder id={active} onBack={() => setActive("overview")}/>}
+          </> : active === "files" ? <FileManager/> : active === "toolbox" ? <Toolbox/> : active === "games" ? <GameHub/> : active === "saves" ? <SaveCenter/> : active === "settings" ? <Settings/> : <ModulePlaceholder id={active} onBack={() => setActive("overview")}/>}
           <footer><span>DIAMANDIS ONE <b>•</b> BUILT FOR YOUR DESKTOP</span><span><Clock3 size={12}/> PRÉ-ALPHA 0.1.1</span></footer>
         </div>
       </main>
@@ -122,6 +125,8 @@ function App() {
 function FileManager() {
   type Entry = { name: string; path: string; isDir: boolean; size: number | null };
   type Listing = { path: string; parent: string | null; entries: Entry[] };
+  type Preferences = { theme: string; defaultFolder: string; confirmBeforeDelete: boolean; openLastFolder: boolean; lastFolder: string };
+  type ActionMode = "rename" | "copy" | "move" | "delete";
   const [listing, setListing] = useState<Listing | null>(null);
   const [path, setPath] = useState("");
   const [filter, setFilter] = useState("");
@@ -129,17 +134,59 @@ function FileManager() {
   const [error, setError] = useState("");
   const [newName, setNewName] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [selected, setSelected] = useState<Entry | null>(null);
+  const [action, setAction] = useState<ActionMode | null>(null);
+  const [actionValue, setActionValue] = useState("");
+  const [preferences, setPreferences] = useState<Preferences>({theme:"dark",defaultFolder:"",confirmBeforeDelete:true,openLastFolder:false,lastFolder:""});
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
   const load = useCallback(async (target?: string) => {
-    setBusy(true); setError("");
-    try { const data = await invoke<Listing>("list_directory", { path: target || null }); setListing(data); setPath(data.path); }
-    catch (e) { setError(String(e)); } finally { setBusy(false); }
+    setBusy(true); setError(""); setSelected(null);
+    try {
+      const data = await invoke<Listing>("list_directory", { path: target || null });
+      setListing(data); setPath(data.path);
+      if (preferences.openLastFolder) {
+        const next = { ...preferences, lastFolder: data.path };
+        setPreferences(next);
+        void invoke("save_settings", { settings: next }).catch(() => {});
+      }
+    } catch (e) { setError(String(e)); }
+    finally { setBusy(false); }
+  }, [preferences]);
+
+  useEffect(() => {
+    let active = true;
+    invoke<Preferences>("load_settings").then(settings => {
+      if (!active) return;
+      setPreferences(settings);
+      const initial = settings.openLastFolder && settings.lastFolder ? settings.lastFolder : settings.defaultFolder;
+      setSettingsLoaded(true);
+      void load(initial || undefined);
+    }).catch(() => { if (active) { setSettingsLoaded(true); void load(); } });
+    return () => { active = false; };
   }, []);
-  useEffect(() => { if (!listing) void load(); }, [listing, load]);
+
   const visible = useMemo(() => listing?.entries.filter(x => x.name.toLowerCase().includes(filter.toLowerCase())) ?? [], [listing, filter]);
   const create = async (event: FormEvent) => {
     event.preventDefault(); if (!listing || !newName.trim()) return;
     try { await invoke("create_directory", { parent: listing.path, name: newName.trim() }); setNewName(""); setShowNew(false); await load(listing.path); }
     catch (e) { setError(String(e)); }
+  };
+  const runAction = async () => {
+    if (!selected || !action) return;
+    setError("");
+    try {
+      if (action === "rename") await invoke("rename_item", { path: selected.path, newName: actionValue });
+      if (action === "copy") await invoke("copy_file", { path: selected.path, destinationFolderPath: actionValue });
+      if (action === "move") await invoke("move_item", { path: selected.path, destinationFolderPath: actionValue });
+      if (action === "delete") await invoke("delete_item", { path: selected.path });
+      setAction(null); setActionValue(""); await load(listing?.path);
+    } catch (e) { setError(String(e)); }
+  };
+  const openAction = (mode: ActionMode) => {
+    if (!selected) return;
+    setAction(mode);
+    setActionValue(mode === "rename" ? selected.name : mode === "delete" ? "" : listing?.path ?? "");
   };
   const size = (n: number | null) => n === null ? "—" : n < 1024 ? n + " B" : n < 1048576 ? (n/1024).toFixed(1)+" KB" : n < 1073741824 ? (n/1048576).toFixed(1)+" MB" : (n/1073741824).toFixed(2)+" GB";
   return <section className="file-manager">
@@ -149,14 +196,27 @@ function FileManager() {
       <button className="toolbar-button" disabled={busy} onClick={() => void load(path || undefined)} title="Atualizar"><RefreshCw size={15}/></button>
     </div><button className="primary-button compact" onClick={() => setShowNew(v => !v)}><FolderPlus size={15}/> Nova pasta</button></div>
     {showNew && <form className="new-folder-form" onSubmit={create}><FolderPlus size={16}/><input autoFocus value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome da nova pasta"/><button className="primary-button compact" disabled={!newName.trim()}>Criar pasta</button><button type="button" className="toolbar-button" onClick={() => setShowNew(false)}>Cancelar</button></form>}
+    {selected && <div className="file-selection-bar"><span><strong>{selected.name}</strong> selecionado</span><div>
+      <button onClick={() => openAction("rename")}>Renomear</button>
+      {!selected.isDir && <button onClick={() => openAction("copy")}>Copiar</button>}
+      <button onClick={() => openAction("move")}>Mover</button>
+      <button className="danger-action" onClick={() => openAction("delete")}>Enviar à Lixeira</button>
+    </div></div>}
     {error && <div className="file-message error-message">{error}</div>}
-    <div className="file-list-header"><div><h3>Arquivos e pastas</h3><p>{listing?.path ?? "Escolha uma pasta para começar"}</p></div><div className="file-list-actions"><span>{visible.length} ITENS</span><label className="file-search"><Search size={14}/><input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filtrar nesta pasta"/></label></div></div>
+    <div className="file-list-header"><div><h3>Arquivos e pastas</h3><p>{listing?.path ?? (settingsLoaded ? "Escolha uma pasta para começar" : "Carregando preferências...")}</p></div><div className="file-list-actions"><span>{visible.length} ITENS</span><label className="file-search"><Search size={14}/><input value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filtrar nesta pasta"/></label></div></div>
     <div className="file-table"><div className="file-table-head"><span>NOME</span><span>TIPO</span><span>TAMANHO</span></div>
-      {busy ? <div className="file-empty"><LoaderCircle className="spin" size={24}/><strong>Carregando pasta...</strong></div> : visible.length ? visible.map(item => <button className="file-row" key={item.path} onClick={() => item.isDir && void load(item.path)}><span className="file-name">{item.isDir ? <Folder size={18} className="folder-color"/> : <File size={17}/>}<strong>{item.name}</strong></span><span>{item.isDir ? "Pasta" : "Arquivo"}</span><span>{size(item.size)}</span></button>) : <div className="file-empty"><Folder size={25}/><strong>{filter ? "Nenhum resultado" : "Esta pasta está vazia"}</strong><span>Os itens desta localização aparecerão aqui.</span></div>}
-    </div><div className="file-manager-foot"><ShieldCheck size={14}/> Navegação e criação de pastas. Nenhum arquivo será removido ou sobrescrito.</div>
+      {busy ? <div className="file-empty"><LoaderCircle className="spin" size={24}/><strong>Carregando pasta...</strong></div> : visible.length ? visible.map(item => <div role="button" tabIndex={0} className={selected?.path === item.path ? "file-row selected" : "file-row"} key={item.path} onClick={() => setSelected(item)} onDoubleClick={() => item.isDir && void load(item.path)} onKeyDown={e => { if (e.key === "Enter") item.isDir && void load(item.path); }}>
+        <span className="file-name">{item.isDir ? <Folder size={18} className="folder-color"/> : <File size={17}/>}<strong>{item.name}</strong></span><span>{item.isDir ? "Pasta" : "Arquivo"}</span><span>{size(item.size)}</span>
+      </div>) : <div className="file-empty"><Folder size={25}/><strong>{filter ? "Nenhum resultado" : "Esta pasta está vazia"}</strong><span>Os itens desta localização aparecerão aqui.</span></div>}
+    </div><div className="file-manager-foot"><ShieldCheck size={14}/> Exclusões vão para a Lixeira. Cópias e movimentos não sobrescrevem arquivos existentes.</div>
+    {action && selected && <div className="file-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAction(null); }}><div className="file-modal" role="dialog" aria-modal="true" aria-labelledby="file-modal-title">
+      <h3 id="file-modal-title">{action === "rename" ? "Renomear item" : action === "copy" ? "Copiar arquivo" : action === "move" ? "Mover item" : "Enviar para a Lixeira"}</h3>
+      <p>{action === "delete" ? <>O item <strong>{selected.name}</strong> será enviado à Lixeira do Windows. Ele não será excluído permanentemente.</> : action === "rename" ? "Informe o novo nome. A extensão pode ser mantida ou alterada." : action === "copy" ? "Informe o caminho completo da pasta de destino. Arquivos existentes não serão sobrescritos." : "Informe o caminho completo da pasta de destino. A operação não atravessa discos diferentes."}</p>
+      {action !== "delete" && <input autoFocus value={actionValue} onChange={e => setActionValue(e.target.value)} placeholder={action === "rename" ? "Novo nome" : "C:\\Caminho\\da\\pasta"}/>}
+      <div className="file-modal-actions"><button className="toolbar-button" onClick={() => setAction(null)}>Cancelar</button><button className={action === "delete" ? "danger-button" : "primary-button compact"} onClick={() => void runAction()} disabled={action !== "delete" && !actionValue.trim()}>{action === "delete" ? "Enviar à Lixeira" : "Confirmar"}</button></div>
+    </div></div>}
   </section>;
 }
-
 
 function Toolbox() {
   const [textValue, setTextValue] = useState("");
