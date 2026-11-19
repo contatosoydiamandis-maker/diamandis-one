@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permissões básicas da janela principal do DIAMANDIS ONE",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
