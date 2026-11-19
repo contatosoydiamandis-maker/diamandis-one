@@ -1,6 +1,7 @@
 use serde::Serialize;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::io::ErrorKind;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,12 +19,12 @@ fn core_diagnostic() -> String {
 #[tauri::command]
 fn list_directory(path: Option<String>) -> Result<DirectoryListing, String> {
     let requested = path.filter(|v| !v.trim().is_empty()).map(PathBuf::from).unwrap_or_else(home_dir);
-    let canonical = requested.canonicalize().map_err(|e| format!("Não foi possível acessar esta pasta: {e}"))?;
+    let canonical = requested.canonicalize().map_err(|e| friendly_io_error("acessar esta pasta", &e))?;
     if !canonical.is_dir() { return Err("O caminho informado não é uma pasta.".into()); }
-    let iterator = fs::read_dir(&canonical).map_err(|e| format!("Não foi possível listar esta pasta: {e}"))?;
+    let iterator = fs::read_dir(&canonical).map_err(|e| friendly_io_error("listar esta pasta", &e))?;
     let mut entries = Vec::new();
     for item in iterator {
-        let item = item.map_err(|e| format!("Falha ao ler um item: {e}"))?;
+        let item = item.map_err(|e| friendly_io_error("ler um item desta pasta", &e))?;
         let item_path = item.path();
         let metadata = item.metadata().ok();
         let is_dir = metadata.as_ref().map(|m| m.is_dir()).unwrap_or(false);
@@ -45,22 +46,47 @@ fn list_directory(path: Option<String>) -> Result<DirectoryListing, String> {
 #[tauri::command]
 fn create_directory(parent: String, name: String) -> Result<(), String> {
     let name = validate_folder_name(&name)?;
-    let parent = PathBuf::from(parent).canonicalize().map_err(|e| format!("Não foi possível acessar o destino: {e}"))?;
+    let parent = PathBuf::from(parent).canonicalize().map_err(|e| friendly_io_error("acessar a pasta de destino", &e))?;
     if !parent.is_dir() { return Err("O destino informado não é uma pasta.".into()); }
     let destination = parent.join(name);
     if destination.exists() { return Err("Já existe um item com esse nome.".into()); }
-    fs::create_dir(destination).map_err(|e| format!("Não foi possível criar a pasta: {e}"))
+    fs::create_dir(destination).map_err(|e| friendly_io_error("criar a pasta", &e))
 }
 
+
+fn friendly_io_error(action: &str, error: &std::io::Error) -> String {
+    let reason = match error.kind() {
+        ErrorKind::NotFound => "o local não foi encontrado",
+        ErrorKind::PermissionDenied => "o Windows não permitiu o acesso. Verifique as permissões",
+        ErrorKind::AlreadyExists => "já existe um item com esse nome",
+        ErrorKind::InvalidInput | ErrorKind::InvalidData => "o caminho ou os dados informados são inválidos",
+        ErrorKind::DirectoryNotEmpty => "a pasta não está vazia",
+        _ => "ocorreu um erro inesperado",
+    };
+    format!("Não foi possível {action}: {reason}.")
+}
 
 fn validate_folder_name(name: &str) -> Result<&str, String> {
     let clean = name.trim();
     let candidate = Path::new(clean);
+    let reserved_stem = clean.split('.').next().unwrap_or("").trim().to_ascii_uppercase();
+    let reserved_device = matches!(reserved_stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || (["COM", "LPT"].iter().any(|prefix| {
+            reserved_stem.strip_prefix(prefix)
+                .and_then(|suffix| suffix.parse::<u8>().ok())
+                .is_some_and(|number| (1..=9).contains(&number))
+        }));
+    let invalid_windows_character = clean.chars().any(|ch| {
+        ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\\\' | '|' | '?' | '*')
+    });
     if clean.is_empty()
+        || clean.ends_with([' ', '.'])
+        || invalid_windows_character
+        || reserved_device
         || !matches!(candidate.components().next(), Some(Component::Normal(_)))
         || candidate.components().count() != 1
     {
-        return Err("Informe um nome de pasta válido, sem caminhos.".into());
+        return Err("Use um nome de pasta válido para o Windows. Evite caminhos, caracteres especiais e nomes reservados.".into());
     }
     Ok(clean)
 }
@@ -82,6 +108,11 @@ mod tests {
         assert!(validate_folder_name("..").is_err());
         assert!(validate_folder_name("../fora").is_err());
         assert!(validate_folder_name("pasta/subpasta").is_err());
+        assert!(validate_folder_name("pasta\\\\subpasta").is_err());
+        assert!(validate_folder_name("CON").is_err());
+        assert!(validate_folder_name("NUL.txt").is_err());
+        assert!(validate_folder_name("nome.").is_err());
+        assert!(validate_folder_name("nome?invalido").is_err());
     }
 }
 
