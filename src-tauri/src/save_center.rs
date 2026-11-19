@@ -172,42 +172,54 @@ fn find_game(games: &[SaveGame], id: &str) -> Result<SaveGame, String> {
     games.iter().find(|g| g.id == id).cloned().ok_or_else(|| "Jogo não encontrado no Save Center.".into())
 }
 
+fn create_backup_for_game(app: &AppHandle, game: &SaveGame) -> Result<SaveBackup, String> {
+    crate::totk_recomp::ensure_campaign_stopped(app, &game.save_path)?;
+    let source = PathBuf::from(&game.save_path).canonicalize().map_err(|_| "A pasta de saves não está mais disponível.".to_string())?;
+    if !source.is_dir() { return Err("A origem do save não é uma pasta.".into()); }
+    let id = unique_id();
+    let root = backup_root(app)?.join(&game.id);
+    fs::create_dir_all(&root).map_err(|_| "Não foi possível criar a pasta do jogo.".to_string())?;
+    let destination = root.join(&id);
+    fs::create_dir_all(&destination).map_err(|_| "Não foi possível iniciar o backup.".to_string())?;
+    let payload = destination.join("payload");
+    let mut stats = (0u64, 0u64);
+    if let Err(error) = copy_tree(&source, &payload, &mut stats) {
+        let _ = fs::remove_dir_all(&destination);
+        return Err(format!("Backup cancelado: {}. Nenhum arquivo original foi alterado.", error));
+    }
+    let file_hashes = match collect_hashes(&payload) {
+        Ok(hashes) => hashes,
+        Err(error) => {
+            let _ = fs::remove_dir_all(&destination);
+            return Err(format!("Não foi possível verificar a integridade do backup: {error}"));
+        }
+    };
+    let backup = SaveBackup {
+        id, game_id: game.id.clone(), game_name: game.name.clone(), created_at: stamp(),
+        source_path: source.to_string_lossy().into_owned(), size_bytes: stats.0,
+        file_count: stats.1, file_hashes, backup_path: destination.to_string_lossy().into_owned(),
+    };
+    let manifest = serde_json::to_vec_pretty(&backup).map_err(|_| "Não foi possível preparar os dados do backup.".to_string())?;
+    if let Err(error) = fs::write(destination.join("backup.json"), manifest) {
+        let _ = fs::remove_dir_all(&destination);
+        return Err(format!("Não foi possível finalizar o backup: {error}"));
+    }
+    Ok(backup)
+}
+
+pub fn create_backup_for_path(app: &AppHandle, save_path: &Path) -> Result<SaveBackup, String> {
+    let canonical = save_path.canonicalize().map_err(|_| "A pasta da campanha não está mais disponível.".to_string())?;
+    let games = read_games(app)?;
+    let game = games.iter().find(|game| PathBuf::from(&game.save_path).canonicalize().ok().as_ref() == Some(&canonical))
+        .ok_or_else(|| "Cadastre a pasta da campanha no Save Center antes de iniciar. Nenhum jogo foi iniciado.".to_string())?;
+    create_backup_for_game(app, game)
+}
+
 #[tauri::command]
 pub async fn create_save_backup(app: AppHandle, game_id: String) -> Result<SaveBackup, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let game = find_game(&read_games(&app)?, &game_id)?;
-        crate::totk_recomp::ensure_campaign_stopped(&app, &game.save_path)?;
-        let source = PathBuf::from(&game.save_path).canonicalize().map_err(|_| "A pasta de saves não está mais disponível.".to_string())?;
-        if !source.is_dir() { return Err("A origem do save não é uma pasta.".into()); }
-        let id = unique_id();
-        let root = backup_root(&app)?.join(&game.id);
-        fs::create_dir_all(&root).map_err(|_| "Não foi possível criar a pasta do jogo.".to_string())?;
-        let destination = root.join(&id);
-        fs::create_dir_all(&destination).map_err(|_| "Não foi possível iniciar o backup.".to_string())?;
-        let payload = destination.join("payload");
-        let mut stats = (0u64, 0u64);
-        if let Err(error) = copy_tree(&source, &payload, &mut stats) {
-            let _ = fs::remove_dir_all(&destination);
-            return Err(format!("Backup cancelado: {}. Nenhum arquivo original foi alterado.", error));
-        }
-        let file_hashes = match collect_hashes(&payload) {
-            Ok(hashes) => hashes,
-            Err(error) => {
-                let _ = fs::remove_dir_all(&destination);
-                return Err(format!("Não foi possível verificar a integridade do backup: {error}"));
-            }
-        };
-        let backup = SaveBackup {
-            id, game_id: game.id, game_name: game.name, created_at: stamp(),
-            source_path: source.to_string_lossy().into_owned(), size_bytes: stats.0,
-            file_count: stats.1, file_hashes, backup_path: destination.to_string_lossy().into_owned(),
-        };
-        let manifest = serde_json::to_vec_pretty(&backup).map_err(|_| "Não foi possível preparar os dados do backup.".to_string())?;
-        if let Err(error) = fs::write(destination.join("backup.json"), manifest) {
-            let _ = fs::remove_dir_all(&destination);
-            return Err(format!("Não foi possível finalizar o backup: {error}"));
-        }
-        Ok(backup)
+        create_backup_for_game(&app, &game)
     }).await.map_err(|_| "Falha ao criar backup em segundo plano.".to_string())?
 }
 
