@@ -88,6 +88,7 @@ pub async fn list_save_games(app: AppHandle) -> Result<Vec<SaveGame>, String> {
 #[tauri::command]
 pub async fn add_save_game(app: AppHandle, name: String, save_path: String) -> Result<SaveGame, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = crate::totk_recomp::operation_lock()?;
         let name = name.trim();
         if name.is_empty() || name.len() > 120 { return Err("Informe um nome de jogo válido (até 120 caracteres).".into()); }
         if save_path.trim().is_empty() || save_path.len() > 32_000 { return Err("Informe uma pasta de save válida.".into()); }
@@ -107,6 +108,7 @@ pub async fn add_save_game(app: AppHandle, name: String, save_path: String) -> R
 #[tauri::command]
 pub async fn remove_save_game(app: AppHandle, game_id: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = crate::totk_recomp::operation_lock()?;
         let mut games = read_games(&app)?;
         let before = games.len();
         games.retain(|g| g.id != game_id);
