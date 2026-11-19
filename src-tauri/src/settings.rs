@@ -9,6 +9,7 @@ pub struct AppSettings {
     pub default_folder: String,
     pub confirm_before_delete: bool,
     pub open_last_folder: bool,
+    pub last_folder: String,
 }
 
 impl Default for AppSettings {
@@ -18,6 +19,7 @@ impl Default for AppSettings {
             default_folder: String::new(),
             confirm_before_delete: true,
             open_last_folder: false,
+            last_folder: String::new(),
         }
     }
 }
@@ -62,7 +64,7 @@ fn validate_settings(settings: &AppSettings) -> Result<(), String> {
     if !matches!(settings.theme.as_str(), "dark" | "light" | "system") {
         return Err("Tema selecionado inválido.".into());
     }
-    if settings.default_folder.len() > 32_000 || settings.default_folder.contains('\0') {
+    if settings.default_folder.len() > 32_000 || settings.default_folder.contains('\0') || settings.last_folder.len() > 32_000 {
         return Err("A pasta inicial informada é inválida.".into());
     }
     Ok(())
