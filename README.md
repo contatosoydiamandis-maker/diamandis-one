@@ -2,7 +2,7 @@
 
 **Um hub desktop local-first para Windows:** organização de arquivos, ferramentas de produtividade e gerenciamento da biblioteca gamer em um só lugar.
 
-> **Status: início do desenvolvimento.** A versão 0.1.0 é uma fundação visual e estrutural. Os módulos File Manager, Toolbox, GameHub e Save Center ainda estão em planejamento/implementação. O projeto ainda não tem uma versão estável nem um instalador validado.
+> **Status: desenvolvimento ativo (pré-alpha).** A versão 0.1.1 já possui a interface desktop Tauri e um File Manager inicial com navegação real por diretórios e criação de pastas. Toolbox, GameHub e Save Center continuam em implementação. O build Windows e o instalador ainda precisam de validação em máquina Windows.
 
 ## Visão do projeto
 
@@ -22,10 +22,10 @@
 
 | Área | Estado |
 |---|---|
-| Dashboard e identidade visual | Fundação inicial |
+| Dashboard e identidade visual | Interface desktop inicial |
 | Navegação modular | Estrutura inicial |
-| Núcleo Rust e diagnóstico | Estrutura inicial |
-| File Manager | Planejado |
+| Núcleo Rust e diagnóstico | Diagnóstico + comandos de diretório |
+| File Manager | Inicial: navegar diretórios, filtrar itens e criar pastas |
 | Toolbox | Planejado |
 | GameHub e conectores | Planejado |
 | Save Center | Planejado, aproveitando o Save Manager existente |
