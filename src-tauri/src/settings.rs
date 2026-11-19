@@ -58,7 +58,7 @@ pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String
         let mut file = fs::OpenOptions::new().write(true).create_new(true).open(&temp)?;
         file.write_all(&json)?;
         file.sync_all()?;
-        fs::rename(&temp, &path)?;
+        crate::atomic_file::replace(&temp, &path)?;
         Ok(())
     })();
     if result.is_err() { let _ = fs::remove_file(&temp); }
