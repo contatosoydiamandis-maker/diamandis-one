@@ -33,6 +33,7 @@
     "windows": {
       "nsis": {
         "displayLanguageSelector": false,
+        "installMode": "currentUser",
         "languages": [
           "PortugueseBR"
         ]
