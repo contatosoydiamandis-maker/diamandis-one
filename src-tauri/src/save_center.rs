@@ -28,6 +28,10 @@ fn stamp() -> String {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis().to_string()
 }
 
+fn unique_id() -> String {
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos().to_string()
+}
+
 fn data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let root = app.path().app_local_data_dir()
         .map_err(|_| "Não foi possível localizar os dados locais do aplicativo.".to_string())?
@@ -55,10 +59,10 @@ fn read_games(app: &AppHandle) -> Result<Vec<SaveGame>, String> {
 
 fn write_games(app: &AppHandle, games: &[SaveGame]) -> Result<(), String> {
     let path = games_file(app)?;
-    let temp = path.with_extension("json.tmp");
     let bytes = serde_json::to_vec_pretty(games).map_err(|_| "Não foi possível preparar o cadastro.".to_string())?;
-    fs::write(&temp, bytes).map_err(|_| "Não foi possível gravar o cadastro de jogos.".to_string())?;
-    fs::rename(&temp, &path).map_err(|_| "Não foi possível concluir a atualização do cadastro.".to_string())
+    let mut file = fs::File::create(&path).map_err(|_| "Não foi possível gravar o cadastro de jogos.".to_string())?;
+    use std::io::Write;
+    file.write_all(&bytes).and_then(|_| file.sync_all()).map_err(|_| "Não foi possível concluir a atualização do cadastro.".to_string())
 }
 
 #[tauri::command]
@@ -79,7 +83,7 @@ pub async fn add_save_game(app: AppHandle, name: String, save_path: String) -> R
         if games.iter().any(|g| PathBuf::from(&g.save_path) == path) {
             return Err("Esta pasta já está cadastrada no Save Center.".into());
         }
-        let game = SaveGame { id: stamp(), name: name.to_string(), save_path: path.to_string_lossy().into_owned(), added_at: stamp() };
+        let game = SaveGame { id: unique_id(), name: name.to_string(), save_path: path.to_string_lossy().into_owned(), added_at: stamp() };
         games.push(game.clone());
         write_games(&app, &games)?;
         Ok(game)
@@ -127,7 +131,7 @@ pub async fn create_save_backup(app: AppHandle, game_id: String) -> Result<SaveB
         let game = find_game(&read_games(&app)?, &game_id)?;
         let source = PathBuf::from(&game.save_path).canonicalize().map_err(|_| "A pasta de saves não está mais disponível.".to_string())?;
         if !source.is_dir() { return Err("A origem do save não é uma pasta.".into()); }
-        let id = stamp();
+        let id = unique_id();
         let root = backup_root(&app)?.join(&game.id);
         fs::create_dir_all(&root).map_err(|_| "Não foi possível criar a pasta do jogo.".to_string())?;
         let destination = root.join(&id);
@@ -183,13 +187,18 @@ pub async fn restore_save_backup(app: AppHandle, backup_id: String, game_id: Str
         let backup = backups.into_iter().find(|b| b.id == backup_id).ok_or_else(|| "Backup não encontrado para este jogo.".to_string())?;
         let target = PathBuf::from(&game.save_path).canonicalize().map_err(|_| "A pasta de destino não está disponível.".to_string())?;
         if !target.is_dir() { return Err("O destino atual não é uma pasta.".into()); }
-        let payload = PathBuf::from(&backup.backup_path).join("payload");
+        let backup_dir = backup_root(&app)?.join(&game.id).join(&backup.id);
+        let payload = backup_dir.join("payload");
         if !payload.is_dir() { return Err("O conteúdo deste backup está incompleto.".into()); }
         let parent = target.parent().ok_or_else(|| "Não foi possível determinar a pasta pai do save.".to_string())?;
         let stage = parent.join(format!(".diamandis-restore-{}", stamp()));
         let safety = parent.join(format!(".diamandis-pre-restore-{}", stamp()));
         let mut stats = (0u64, 0u64);
         copy_tree(&payload, &stage, &mut stats).map_err(|e| { let _ = fs::remove_dir_all(&stage); format!("Não foi possível preparar a restauração: {e}") })?;
+        if stats.0 != backup.size_bytes || stats.1 != backup.file_count {
+            let _ = fs::remove_dir_all(&stage);
+            return Err("A verificação do backup falhou. O save atual permaneceu intacto.".into());
+        }
         fs::rename(&target, &safety).map_err(|e| { let _ = fs::remove_dir_all(&stage); format!("Não foi possível proteger o save atual antes da restauração: {e}") })?;
         if let Err(error) = fs::rename(&stage, &target) {
             let _ = fs::rename(&safety, &target);
