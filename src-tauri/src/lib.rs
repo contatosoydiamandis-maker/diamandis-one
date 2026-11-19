@@ -21,7 +21,12 @@ fn core_diagnostic() -> String {
 }
 
 #[tauri::command]
-fn list_directory(path: Option<String>) -> Result<DirectoryListing, String> {
+async fn list_directory(path: Option<String>) -> Result<DirectoryListing, String> {
+    tauri::async_runtime::spawn_blocking(move || list_directory_impl(path)).await
+        .map_err(|_| "Não foi possível carregar esta pasta em segundo plano.".to_string())?
+}
+
+fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing, String> {
     let requested = path.filter(|v| !v.trim().is_empty()).map(PathBuf::from).unwrap_or_else(home_dir);
     let canonical = requested.canonicalize().map_err(|e| friendly_io_error("acessar esta pasta", &e))?;
     if !canonical.is_dir() { return Err("O caminho informado não é uma pasta.".into()); }
@@ -48,7 +53,12 @@ fn list_directory(path: Option<String>) -> Result<DirectoryListing, String> {
 }
 
 #[tauri::command]
-fn create_directory(parent: String, name: String) -> Result<(), String> {
+async fn create_directory(parent: String, name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || create_directory_impl(parent, name)).await
+        .map_err(|_| "Não foi possível criar a pasta em segundo plano.".to_string())?
+}
+
+fn create_directory_impl(parent: String, name: String) -> Result<(), String> {
     let name = validate_folder_name(&name)?;
     let parent = PathBuf::from(parent).canonicalize().map_err(|e| friendly_io_error("acessar a pasta de destino", &e))?;
     if !parent.is_dir() { return Err("O destino informado não é uma pasta.".into()); }
