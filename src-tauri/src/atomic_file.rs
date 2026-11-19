@@ -1,4 +1,6 @@
-use std::{fs, io, path::Path};
+use std::{io, path::Path};
+#[cfg(not(windows))]
+use std::fs;
 
 #[cfg(windows)]
 pub fn replace(source: &Path, destination: &Path) -> io::Result<()> {
