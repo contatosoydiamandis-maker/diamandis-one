@@ -103,3 +103,19 @@ pub fn scan_games() -> Result<Vec<GameEntry>, String> {
     games.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     Ok(games)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::quoted_value;
+
+    #[test]
+    fn reads_quoted_vdf_values() {
+        assert_eq!(quoted_value(r#""path" "D:\\Games\\Steam""#, "path"), Some(r#"D:\\Games\\Steam"#.into()));
+        assert_eq!(quoted_value(r#""name" "Portal 2""#, "name"), Some("Portal 2".into()));
+    }
+
+    #[test]
+    fn ignores_other_vdf_keys() {
+        assert_eq!(quoted_value(r#""appid" "620""#, "path"), None);
+    }
+}
