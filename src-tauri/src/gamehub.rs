@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::{collections::HashSet, env, fs, path::{Path, PathBuf}};
+use std::{collections::HashSet, env, fs, path::PathBuf};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,15 +49,14 @@ fn scan_steam(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>) {
                 if file.extension().and_then(|v| v.to_str()) != Some("acf") { continue; }
                 let Ok(text) = fs::read_to_string(&file) else { continue };
                 let mut name = None;
-                let mut appid = None;
+                let mut install_dir = None;
                 for line in text.lines() {
                     let line = line.trim();
                     if name.is_none() { name = quoted_value(line, "name"); }
-                    if appid.is_none() { appid = quoted_value(line, "appid"); }
+                    if install_dir.is_none() { install_dir = quoted_value(line, "installdir"); }
                 }
-                if let (Some(name), Some(appid)) = (name, appid) {
-                    add_game(games, seen, name, "Steam", steamapps.join(format!("common/{}", name)));
-                    let _ = appid;
+                if let (Some(name), Some(install_dir)) = (name, install_dir) {
+                    add_game(games, seen, name, "Steam", steamapps.join("common").join(install_dir));
                 }
             }
         }
