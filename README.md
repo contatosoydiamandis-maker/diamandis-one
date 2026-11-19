@@ -2,7 +2,7 @@
 
 **Um hub desktop local-first para Windows:** organização de arquivos, ferramentas de produtividade e gerenciamento da biblioteca gamer em um só lugar.
 
-> **Status: pré-alpha 0.2.1.** A interface desktop inclui navegação real de arquivos, operações controladas, preferências persistentes, descoberta inicial de jogos Steam/Epic/GOG e um Save Center funcional em seu primeiro MVP. O Save Center permite cadastrar pastas, criar backups locais e restaurá-los preservando o estado anterior. Seleção de pastas nativa já integrada. Adaptadores automáticos, perfis de campanha e verificação criptográfica ainda estão em desenvolvimento. CI verde cobre o frontend e os testes nativos; instalador e testes físicos ainda precisam de validação manual.
+> **Status: pré-alpha 0.2.0.** A base desktop inclui navegação de arquivos, operações controladas, preferências persistentes, descoberta inicial de jogos Steam/Epic/GOG e Save Center com backups SHA-256 e restauração protegida. O adaptador TOTK Recomp já oferece campanhas isoladas, importação por cópia e backup obrigatório antes de iniciar. A CI validou frontend, testes Rust e geração do instalador NSIS. Ainda faltam testes físicos em Windows limpo e validação com uma instalação real do TOTK Recomp.
 
 ## Visão do projeto
 
@@ -29,13 +29,13 @@
 | GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG |
 | Save Center | Cadastro manual de pastas, backups locais, histórico e restauração protegida |
 | Seleção de pastas | Diálogo nativo do Windows via Tauri |
-| Build/instalador | Pipeline preparado; ainda não validado em máquina Windows limpa |
+| Build/instalador | CI gera instalador NSIS x64; instalação física ainda não validada em máquina Windows limpa |
 
 ## Instalação para usuários
 
-A versão distribuída será instalada por um assistente gráfico do Windows. Usuários finais não precisarão instalar Node.js ou Rust, nem abrir CMD ou PowerShell. Consulte [Instalação e uso](docs/INSTALLATION.md).
+A versão distribuída será instalada por um assistente gráfico do Windows. Usuários finais não precisarão instalar Node.js ou Rust, nem abrir CMD ou PowerShell. Consulte [Instalação e uso](docs/INSTALLATION.md). O artefato de CI atual é experimental e não representa uma versão estável.
 
-O workflow de instalador pode ser executado pela aba **Actions** do GitHub ou por uma tag v*. Os pacotes gerados são artefatos de teste; nenhuma versão será considerada estável sem testes reais em Windows limpo.
+O workflow de instalador é executado automaticamente em Pull Requests direcionados à `main` e em pushes na `main`. Os pacotes gerados são artefatos temporários de teste, não releases públicas. Nenhuma versão será considerada estável sem testes reais em Windows limpo.
 
 ## Desenvolvimento
 
@@ -73,11 +73,11 @@ Use os modelos de issue para reportar bugs e sugerir funcionalidades. Leia tamb�
 
 ## Próximos marcos
 
-1. Integridade SHA-256 e testes de restauração com falhas simuladas.
-2. Perfis/campanhas e adaptador dedicado ao Zelda TOTK Recomp.
-3. Detecção de processos para bloquear restauração enquanto o jogo estiver aberto.
-4. Paginação e operações em lote no File Manager.
-5. Instalador validado em Windows limpo.
+1. Testes de restauração com falhas simuladas e validação física do Save Center.
+2. Validar o adaptador TOTK Recomp com instalação real e confirmar `TOTK_PROFILE_DIR`.
+3. Testar instalação, inicialização, atualização manual e remoção em Windows limpo.
+4. Gerar e versionar lockfiles para builds reproduzíveis.
+5. Expandir conectores do GameHub e melhorar operações em lote no File Manager.
 
 ## Licença
 
