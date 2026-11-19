@@ -1,6 +1,12 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, path::{Path, PathBuf}, process::Command, time::{SystemTime, UNIX_EPOCH}};
+use std::{fs, path::{Path, PathBuf}, process::Command, sync::{Mutex, MutexGuard}, time::{SystemTime, UNIX_EPOCH}};
 use tauri::{AppHandle, Manager};
+
+static TOTK_OPERATION_LOCK: Mutex<()> = Mutex::new(());
+
+pub fn operation_lock() -> Result<MutexGuard<'static, ()>, String> {
+    TOTK_OPERATION_LOCK.lock().map_err(|_| "O controle de segurança do TOTK foi interrompido. Reinicie o aplicativo antes de tentar novamente.".to_string())
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -115,6 +121,7 @@ pub async fn list_totk_campaigns(app: AppHandle) -> Result<Vec<TotkCampaign>, St
 #[tauri::command]
 pub async fn import_totk_profile(app: AppHandle, name: String) -> Result<TotkCampaign, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation_lock()?;
         let name = safe_name(&name)?;
         let config = read_config(&app)?;
         let install = validate_install(Path::new(&config.install_path))?;
@@ -134,6 +141,7 @@ pub async fn import_totk_profile(app: AppHandle, name: String) -> Result<TotkCam
 #[tauri::command]
 pub async fn create_empty_totk_campaign(app: AppHandle, name: String) -> Result<TotkCampaign, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation_lock()?;
         let name = safe_name(&name)?;
         let config = read_config(&app)?;
         validate_install(Path::new(&config.install_path))?;
@@ -150,6 +158,7 @@ pub async fn create_empty_totk_campaign(app: AppHandle, name: String) -> Result<
 #[tauri::command]
 pub async fn launch_totk_campaign(app: AppHandle, campaign_id: String) -> Result<crate::save_center::SaveBackup, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let _operation = operation_lock()?;
         if game_running()? { return Err("O TOTK Recomp já está em execução.".into()); }
         let config = read_config(&app)?;
         let install = validate_install(Path::new(&config.install_path))?;
