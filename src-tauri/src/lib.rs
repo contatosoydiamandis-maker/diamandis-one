@@ -51,7 +51,7 @@ fn list_directory_impl(path: Option<String>, offset: usize, limit: usize) -> Res
             file_type.as_ref().map(|kind| kind.is_symlink()).unwrap_or(false),
         ));
     }
-    candidates.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())));
+    candidates.sort_by_cached_key(|item| (std::cmp::Reverse(item.2), item.0.to_lowercase()));
     let total = candidates.len();
     let safe_offset = offset.min(total);
     let entries = candidates.into_iter().skip(safe_offset).take(limit).map(|(name, item_path, is_dir, is_symlink)| {
