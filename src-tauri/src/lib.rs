@@ -76,7 +76,7 @@ fn validate_folder_name(name: &str) -> Result<&str, String> {
                 .is_some_and(|number| (1..=9).contains(&number))
         }));
     let invalid_windows_character = clean.chars().any(|ch| {
-        ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\\\' | '|' | '?' | '*')
+        ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
     });
     if clean.is_empty()
         || clean.ends_with(' ') || clean.ends_with('.')
