@@ -28,6 +28,13 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build frontend
         run: npm run build
+      - name: Upload generated npm lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-lockfile
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 7
 
   rust:
     name: Native core tests
@@ -43,3 +50,10 @@ jobs:
           workspaces: src-tauri -> target
       - name: Run native core tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Upload generated Cargo lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lockfile
+          path: src-tauri/Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
