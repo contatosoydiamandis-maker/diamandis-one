@@ -1,6 +1,7 @@
 mod file_ops;
 mod gamehub;
 mod settings;
+mod save_center;
 
 use serde::Serialize;
 use std::fs;
@@ -107,7 +108,7 @@ fn home_dir() -> PathBuf {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![core_diagnostic, list_directory, create_directory, file_ops::rename_item, file_ops::copy_file, file_ops::move_item, file_ops::delete_item, settings::load_settings, settings::save_settings, gamehub::scan_games])
+        .invoke_handler(tauri::generate_handler![core_diagnostic, list_directory, create_directory, file_ops::rename_item, file_ops::copy_file, file_ops::move_item, file_ops::delete_item, settings::load_settings, settings::save_settings, gamehub::scan_games, save_center::list_save_games, save_center::add_save_game, save_center::remove_save_game, save_center::create_save_backup, save_center::list_save_backups, save_center::restore_save_backup])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar DIAMANDIS ONE");
 }
