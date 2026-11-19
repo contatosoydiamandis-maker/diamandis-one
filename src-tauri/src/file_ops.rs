@@ -38,7 +38,12 @@ fn destination_folder(path: &str) -> Result<PathBuf, String> {
 }
 
 #[tauri::command]
-pub fn rename_item(path: String, new_name: String) -> Result<(), String> {
+pub async fn rename_item(path: String, new_name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || rename_item_impl(path, new_name)).await
+        .map_err(|_| "Não foi possível concluir a operação em segundo plano.".to_string())?
+}
+
+fn rename_item_impl(path: String, new_name: String) -> Result<(), String> {
     let name = valid_name(&new_name)?;
     let source = existing_item(&path)?;
     let parent = source.parent().ok_or("Não é possível renomear este local.")?;
@@ -51,7 +56,12 @@ pub fn rename_item(path: String, new_name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn copy_file(path: String, destination_folder_path: String) -> Result<(), String> {
+pub async fn copy_file(path: String, destination_folder_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || copy_file_impl(path, destination_folder_path)).await
+        .map_err(|_| "Não foi possível concluir a cópia em segundo plano.".to_string())?
+}
+
+fn copy_file_impl(path: String, destination_folder_path: String) -> Result<(), String> {
     let source = existing_item(&path)?;
     if !source.is_file() {
         return Err("A cópia de pastas ainda não está disponível. Selecione um arquivo.".into());
@@ -73,7 +83,12 @@ pub fn copy_file(path: String, destination_folder_path: String) -> Result<(), St
 }
 
 #[tauri::command]
-pub fn move_item(path: String, destination_folder_path: String) -> Result<(), String> {
+pub async fn move_item(path: String, destination_folder_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || move_item_impl(path, destination_folder_path)).await
+        .map_err(|_| "Não foi possível concluir a movimentação em segundo plano.".to_string())?
+}
+
+fn move_item_impl(path: String, destination_folder_path: String) -> Result<(), String> {
     let source = existing_item(&path)?;
     let folder = destination_folder(&destination_folder_path)?;
     let name = source.file_name().ok_or("Nome de item inválido.")?;
@@ -86,7 +101,12 @@ pub fn move_item(path: String, destination_folder_path: String) -> Result<(), St
 }
 
 #[tauri::command]
-pub fn delete_item(path: String) -> Result<(), String> {
+pub async fn delete_item(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || delete_item_impl(path)).await
+        .map_err(|_| "Não foi possível enviar o item à Lixeira em segundo plano.".to_string())?
+}
+
+fn delete_item_impl(path: String) -> Result<(), String> {
     let target = existing_item(&path)?;
     if target.parent().is_none() {
         return Err("Por segurança, não é permitido enviar a raiz de um disco para a Lixeira.".into());
