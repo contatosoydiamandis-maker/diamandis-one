@@ -54,7 +54,7 @@ function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark"><Command size={21} strokeWidth={1.8} /></div>
+          <div className="brand-mark"><img src="/diamandis-mark.svg" alt="" /></div>
           <div><div className="brand-name">DIAMANDIS<span> ONE</span></div><div className="brand-caption">PERSONAL DESKTOP HUB</div></div>
         </div>
 
