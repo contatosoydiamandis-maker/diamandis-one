@@ -44,3 +44,5 @@
 @media(max-width:1050px){.gamehub-grid{grid-template-columns:1fr}.theme-options{grid-template-columns:1fr}}
 
 .brand-mark img{width:29px;height:29px;display:block;object-fit:contain}
+
+@media(prefers-color-scheme:light){:root[data-theme="system"]{color:#252331;background:#f4f2f8;--bg:#f4f2f8;--panel:#fff;--panel2:#eeeaf5;--line:#ded9e8;--muted:#686477;--purple:#7853bd;--purple2:#6842a8;--bronze:#9d7046}:root[data-theme="system"] body{background:radial-gradient(ellipse at 76% 0%,#e7ddf7 0%,transparent 34%),var(--bg);color:#252331}:root[data-theme="system"] .sidebar,:root[data-theme="system"] .topbar{background:#ffffffed;border-color:#ded9e8}:root[data-theme="system"] .module-card,:root[data-theme="system"] .status-card,:root[data-theme="system"] .tool-card,:root[data-theme="system"] .settings-card,:root[data-theme="system"] .gamehub-summary,:root[data-theme="system"] .game-card{background:#fff;border-color:#ded9e8;color:#252331}:root[data-theme="system"] .file-modal{background:#fff;color:#252331;border-color:#d5c9e7}}
