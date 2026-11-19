@@ -13,7 +13,14 @@ struct FileEntry { name: String, path: String, is_dir: bool, size: Option<u64> }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct DirectoryListing { path: String, parent: Option<String>, entries: Vec<FileEntry> }
+struct DirectoryListing {
+    path: String,
+    parent: Option<String>,
+    total: usize,
+    offset: usize,
+    limit: usize,
+    entries: Vec<FileEntry>,
+}
 
 #[tauri::command]
 fn core_diagnostic() -> String {
@@ -21,33 +28,40 @@ fn core_diagnostic() -> String {
 }
 
 #[tauri::command]
-async fn list_directory(path: Option<String>) -> Result<DirectoryListing, String> {
-    tauri::async_runtime::spawn_blocking(move || list_directory_impl(path)).await
+async fn list_directory(path: Option<String>, offset: Option<usize>, limit: Option<usize>) -> Result<DirectoryListing, String> {
+    let offset = offset.unwrap_or(0);
+    let limit = limit.unwrap_or(150).clamp(25, 500);
+    tauri::async_runtime::spawn_blocking(move || list_directory_impl(path, offset, limit)).await
         .map_err(|_| "Não foi possível carregar esta pasta em segundo plano.".to_string())?
 }
 
-fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing, String> {
+fn list_directory_impl(path: Option<String>, offset: usize, limit: usize) -> Result<DirectoryListing, String> {
     let requested = path.filter(|v| !v.trim().is_empty()).map(PathBuf::from).unwrap_or_else(home_dir);
     let canonical = requested.canonicalize().map_err(|e| friendly_io_error("acessar esta pasta", &e))?;
     if !canonical.is_dir() { return Err("O caminho informado não é uma pasta.".into()); }
     let iterator = fs::read_dir(&canonical).map_err(|e| friendly_io_error("listar esta pasta", &e))?;
-    let mut entries = Vec::new();
+    let mut candidates = Vec::new();
     for item in iterator {
         let item = item.map_err(|e| friendly_io_error("ler um item desta pasta", &e))?;
         let item_path = item.path();
-        let metadata = item.metadata().ok();
-        let is_dir = metadata.as_ref().map(|m| m.is_dir()).unwrap_or(false);
-        entries.push(FileEntry {
-            name: item.file_name().to_string_lossy().to_string(),
-            path: item_path.to_string_lossy().to_string(),
-            is_dir,
-            size: metadata.filter(|m| m.is_file()).map(|m| m.len()),
-        });
+        let file_type = item.file_type().map_err(|e| friendly_io_error("identificar um item desta pasta", &e))?;
+        candidates.push((item.file_name().to_string_lossy().to_string(), item_path, file_type.is_dir(), file_type.is_symlink()));
     }
-    entries.sort_by(|a,b| b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    candidates.sort_by(|a, b| b.2.cmp(&a.2).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())));
+    let total = candidates.len();
+    let safe_offset = offset.min(total);
+    let entries = candidates.into_iter().skip(safe_offset).take(limit).map(|(name, item_path, is_dir, is_symlink)| {
+        let size = if !is_dir && !is_symlink {
+            fs::metadata(&item_path).ok().filter(|metadata| metadata.is_file()).map(|metadata| metadata.len())
+        } else { None };
+        FileEntry { name, path: item_path.to_string_lossy().to_string(), is_dir, size }
+    }).collect();
     Ok(DirectoryListing {
         path: canonical.to_string_lossy().to_string(),
         parent: canonical.parent().map(|p| p.to_string_lossy().to_string()),
+        total,
+        offset: safe_offset,
+        limit,
         entries,
     })
 }
