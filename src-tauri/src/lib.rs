@@ -1,3 +1,4 @@
+mod atomic_file;
 mod file_ops;
 mod gamehub;
 mod settings;
