@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import {
   AppWindow, ArrowLeft, ArrowUpRight, Boxes, CheckCircle2, ChevronRight, CircleHelp,
   Clock3, Command, File, FileSearch, Folder, FolderKanban, FolderPlus, Gamepad2, HardDrive,
@@ -135,7 +136,7 @@ function FileManager() {
   }, []);
   useEffect(() => { if (!listing) void load(); }, [listing, load]);
   const visible = useMemo(() => listing?.entries.filter(x => x.name.toLowerCase().includes(filter.toLowerCase())) ?? [], [listing, filter]);
-  const create = async (event: React.FormEvent) => {
+  const create = async (event: FormEvent) => {
     event.preventDefault(); if (!listing || !newName.trim()) return;
     try { await invoke("create_directory", { parent: listing.path, name: newName.trim() }); setNewName(""); setShowNew(false); await load(listing.path); }
     catch (e) { setError(String(e)); }
