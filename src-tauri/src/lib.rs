@@ -86,7 +86,6 @@ fn create_directory_impl(parent: String, name: String) -> Result<(), String> {
     fs::create_dir(destination).map_err(|e| friendly_io_error("criar a pasta", &e))
 }
 
-
 fn friendly_io_error(action: &str, error: &std::io::Error) -> String {
     let reason = match error.kind() {
         ErrorKind::NotFound => "o local não foi encontrado",
@@ -98,7 +97,6 @@ fn friendly_io_error(action: &str, error: &std::io::Error) -> String {
     format!("Não foi possível {action}: {reason}.")
 }
 
-
 fn home_dir() -> PathBuf {
     std::env::var_os("USERPROFILE").map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
@@ -108,6 +106,7 @@ fn home_dir() -> PathBuf {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![core_diagnostic, list_directory, create_directory, file_ops::rename_item, file_ops::copy_file, file_ops::move_item, file_ops::delete_item, settings::load_settings, settings::save_settings, gamehub::scan_games, save_center::list_save_games, save_center::add_save_game, save_center::remove_save_game, save_center::create_save_backup, save_center::list_save_backups, save_center::restore_save_backup])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar DIAMANDIS ONE");

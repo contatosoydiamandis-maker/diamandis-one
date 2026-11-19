@@ -2,34 +2,34 @@
 
 **Um hub desktop local-first para Windows:** organização de arquivos, ferramentas de produtividade e gerenciamento da biblioteca gamer em um só lugar.
 
-> **Status: pré-alpha 0.2.0.** A interface desktop inclui navegação real de arquivos, operações controladas, preferências persistentes e detecção inicial de bibliotecas Steam, Epic Games e GOG. O Save Center aguarda a fonte do Save Manager original para integração sem duplicação. O frontend e os testes nativos passaram em CI antes da implementação atual do Save Center; a nova implementação está em validação. Instalador e testes físicos ainda precisam de validação manual.
+> **Status: pré-alpha 0.2.1.** A interface desktop inclui navegação real de arquivos, operações controladas, preferências persistentes, descoberta inicial de jogos Steam/Epic/GOG e um Save Center funcional em seu primeiro MVP. O Save Center permite cadastrar pastas, criar backups locais e restaurá-los preservando o estado anterior. Seleção de pastas nativa já integrada. Adaptadores automáticos, perfis de campanha e verificação criptográfica ainda estão em desenvolvimento. CI verde cobre o frontend e os testes nativos; instalador e testes físicos ainda precisam de validação manual.
 
 ## Visão do projeto
 
 - **Local-first:** dados e operações permanecem no computador do usuário.
 - **Privacidade:** sem anúncios, sem telemetria invasiva e sem conta ou nuvem obrigatória.
 - **Modular:** Dashboard, File Manager, Toolbox, GameHub, Save Center e Configurações.
-- **Seguro:** operações destrutivas exigem confirmação e usam a Lixeira; cópias não sobrescrevem arquivos.
-- **Extensível:** conectores independentes para launchers e serviços de jogos.
+- **Seguro:** operações destrutivas exigem confirmação e usam a Lixeira; backups são cópias e restaurações preservam o estado anterior.
+- **Extensível:** conectores independentes para launchers e jogos.
 
 ## Stack
 
 - React + TypeScript + Vite
 - Tauri 2 + Rust
-- Persistência local em JSON para preferências; SQLite permanece planejado para dados relacionais do GameHub/Save Center.
+- Persistência local em JSON para preferências e catálogo inicial do Save Center; SQLite permanece planejado quando o volume de dados justificar.
 
 ## Estado atual
 
 | Área | Estado |
 |---|---|
 | Dashboard e identidade visual | Interface desktop com emblema e ícone do instalador |
-| File Manager | Navegação, filtro, criação, renomeação, cópia de arquivos, movimentação e envio à Lixeira |
-| Configurações | Tema escuro/claro/sistema, pasta inicial, confirmação de exclusão e última pasta |
+| File Manager | Navegação, filtro, criação, renomeação, cópia, movimentação e Lixeira |
+| Configurações | Tema escuro/claro/sistema e preferências persistentes |
 | Toolbox | Transformador de texto e formatador JSON offline |
 | GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG |
-| Save Center | Cadastro local de jogos, backup por cópia, histórico e restauração protegida; detecção automática por adaptadores ainda em evolução |
-| Dependências | Versões diretas do frontend fixadas; lockfiles reproduzíveis ainda pendentes |
-| Build/instalador | Pipeline preparado; não validado em máquina Windows |
+| Save Center | Cadastro manual de pastas, backups locais, histórico e restauração protegida |
+| Seleção de pastas | Diálogo nativo do Windows via Tauri |
+| Build/instalador | Pipeline preparado; ainda não validado em máquina Windows limpa |
 
 ## Instalação para usuários
 
@@ -60,7 +60,7 @@ Gerar o instalador:
 npm run tauri build
 ~~~
 
-O comando de build prepara automaticamente o ícone do aplicativo e executa a compilação de produção. Os comandos de terminal pertencem exclusivamente ao desenvolvimento, não à instalação ou ao uso da versão distribuída.
+Os comandos de terminal pertencem exclusivamente ao desenvolvimento, não à instalação ou ao uso da versão distribuída.
 
 ## Como contribuir
 
@@ -71,14 +71,13 @@ O comando de build prepara automaticamente o ícone do aplicativo e executa a co
 
 Use os modelos de issue para reportar bugs e sugerir funcionalidades. Leia também [Código de Conduta](CODE_OF_CONDUCT.md) e [Política de Segurança](SECURITY.md).
 
-## Roadmap
+## Próximos marcos
 
-1. **0.2:** base desktop, preferências, File Manager seguro e GameHub inicial.
-2. **0.3:** paginação, operações em lote com prévia e testes de filesystem.
-3. **0.4:** Toolbox ampliada.
-4. **0.5:** conectores adicionais de launchers e inicialização de jogos.
-5. **0.6:** integrar o Save Manager existente ao Save Center.
-6. **0.7:** testes completos, otimização, acessibilidade e instalador Windows validado.
+1. Integridade SHA-256 e testes de restauração com falhas simuladas.
+2. Perfis/campanhas e adaptador dedicado ao Zelda TOTK Recomp.
+3. Detecção de processos para bloquear restauração enquanto o jogo estiver aberto.
+4. Paginação e operações em lote no File Manager.
+5. Instalador validado em Windows limpo.
 
 ## Licença
 

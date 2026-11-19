@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, CheckCircle2, Clock3, FolderOpen, HardDrive, LoaderCircle, Plus, RefreshCw, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
+import { Archive, CheckCircle2, Clock3, FolderOpen, HardDrive, LoaderCircle, Plus, RefreshCw, RotateCcw, ShieldCheck } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 
 type SaveGame = { id: string; name: string; savePath: string; addedAt: string };
 type SaveBackup = { id: string; gameId: string; gameName: string; createdAt: string; sourcePath: string; sizeBytes: number; fileCount: number; backupPath: string };
@@ -48,6 +49,14 @@ export default function SaveCenter() {
   useEffect(() => { void refresh(); }, [refresh]);
 
   const selected = useMemo(() => games.find(game => game.id === selectedGame), [games, selectedGame]);
+
+  const browseSaveFolder = async () => {
+    setError("");
+    try {
+      const selectedPath = await open({ directory: true, multiple: false, title: "Selecione a pasta de salvamento" });
+      if (typeof selectedPath === "string") setSavePath(selectedPath);
+    } catch (e) { setError(`Não foi possível abrir o seletor de pastas: ${String(e)}`); }
+  };
 
   const addGame = async () => {
     setAdding(true); setError(""); setNotice("");
@@ -110,8 +119,10 @@ export default function SaveCenter() {
         {adding && <div className="save-add-form">
           <div className="save-panel-heading"><strong>Novo jogo</strong><span>Cadastro local</span></div>
           <label>Nome do jogo<input value={name} onChange={e => setName(e.target.value)} placeholder="Ex.: Zelda TOTK Recomp"/></label>
-          <label>Pasta do save<input value={savePath} onChange={e => setSavePath(e.target.value)} placeholder="Ex.: D:\\Jogos\\TOTK\\profile"/></label>
-          <small>Informe o caminho completo da pasta. O DIAMANDIS ONE não altera o conteúdo ao cadastrar.</small>
+          <label>Pasta do save
+            <div className="save-path-picker"><input value={savePath} onChange={e => setSavePath(e.target.value)} placeholder="Selecione a pasta de salvamento"/><button type="button" className="secondary-button" onClick={() => void browseSaveFolder()}><FolderOpen size={14}/> Procurar</button></div>
+          </label>
+          <small>Escolha a pasta que contém os arquivos de progresso. O DIAMANDIS ONE não altera o conteúdo ao cadastrar.</small>
           <div className="save-form-actions"><button className="secondary-button" onClick={() => setAdding(false)}>Cancelar</button><button className="primary-button compact" onClick={() => void addGame()} disabled={!name.trim() || !savePath.trim() || adding}><Plus size={13}/> Cadastrar</button></div>
         </div>}
 
