@@ -185,3 +185,16 @@ body{
 :root[data-theme="light"] .gamehub-favorites{background:#fff;color:#62596e}
 :root[data-theme="light"] .game-card-main strong{color:#30263d}
 :root[data-theme="light"] .gamehub-empty{background:#fff}
+
+.file-manager{padding:15px}
+.file-toolbar{gap:12px;flex-wrap:wrap}
+.file-toolbar-left{min-width:0;flex:1}
+.path-form{min-width:180px}
+.file-list-actions{flex-wrap:wrap;justify-content:flex-end}
+.file-count{padding:0 4px;color:#d1b184}
+.file-sort{height:31px;max-width:112px;padding:0 8px;border:1px solid #393044;border-radius:6px;background:#17151f;color:#c8bdd5;font-size:9px;outline:0}
+.file-sort:focus,.file-search:focus-within,.path-form:focus-within{border-color:#9874bc;box-shadow:0 0 0 3px #9874bc18}
+.file-row:focus-visible,.toolbar-button:focus-visible,.primary-button:focus-visible,.nav-item:focus-visible{outline:2px solid #c6a5f2;outline-offset:2px}
+.file-row:active{background:#30233d}
+@media(max-width:1050px){.file-list-actions{justify-content:flex-start}.file-search{flex:1;min-width:160px}.file-sort{flex:0 0 auto}}
+:root[data-theme="light"] .file-sort{background:#fff;color:#3b3445;border-color:#ded4e8}
