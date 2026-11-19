@@ -1,9 +1,9 @@
 use std::{fs, path::{Component, Path, PathBuf}};
 
-fn valid_name(name: &str) -> Result<&str, String> {
+pub fn validate_name(name: &str) -> Result<&str, String> {
     let clean = name.trim();
-    let stem = clean.split('.').next().unwrap_or("").to_ascii_uppercase();
-    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+    let stem = clean.split('.').next().unwrap_or("").trim().to_ascii_uppercase();
+    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$" | "COM¹" | "COM²" | "COM³" | "LPT¹" | "LPT²" | "LPT³")
         || ["COM", "LPT"].iter().any(|prefix| stem.strip_prefix(*prefix)
             .and_then(|suffix| suffix.parse::<u8>().ok())
             .is_some_and(|n| (1..=9).contains(&n)));
@@ -44,7 +44,7 @@ pub async fn rename_item(path: String, new_name: String) -> Result<(), String> {
 }
 
 fn rename_item_impl(path: String, new_name: String) -> Result<(), String> {
-    let name = valid_name(&new_name)?;
+    let name = validate_name(&new_name)?;
     let source = existing_item(&path)?;
     let parent = source.parent().ok_or("Não é possível renomear este local.")?;
     let destination = parent.join(name);
@@ -117,7 +117,7 @@ fn delete_item_impl(path: String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::valid_name;
+    use super::validate_name;
 
     #[test]
     fn accepts_normal_windows_names() {
@@ -127,7 +127,7 @@ mod tests {
 
     #[test]
     fn rejects_paths_reserved_names_and_invalid_characters() {
-        for name in ["", " ", "..", "../outside", "folder\\\\child", "CON", "NUL.txt", "COM1", "LPT9.log", "bad?.txt", "trailing."] {
+        for name in ["", " ", "..", "../outside", "folder\\\\child", "CON", "NUL.txt", "COM1", "LPT9.log", "NUL .txt", "CONOUT$", "COM¹", "bad?.txt", "trailing."] {
             assert!(valid_name(name).is_err(), "name should be rejected: {name}");
         }
     }
