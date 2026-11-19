@@ -26,7 +26,7 @@
 | Navegação modular | Estrutura inicial |
 | Núcleo Rust e diagnóstico | Diagnóstico + comandos de diretório |
 | File Manager | Inicial: navegar diretórios, filtrar itens e criar pastas |
-| Toolbox | Planejado |
+| Toolbox | Parcial: transformador de texto e formatador JSON offline |
 | GameHub e conectores | Planejado |
 | Save Center | Planejado, aproveitando o Save Manager existente |
 | SQLite e migrações | Planejado |
