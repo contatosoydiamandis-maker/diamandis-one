@@ -42,3 +42,5 @@
 :root[data-theme="light"] .file-modal{background:#fff;color:#252331;border-color:#d5c9e7}
 :root[data-theme="light"] .file-modal p,:root[data-theme="light"] .settings-heading p{color:#696477}
 @media(max-width:1050px){.gamehub-grid{grid-template-columns:1fr}.theme-options{grid-template-columns:1fr}}
+
+.brand-mark img{width:29px;height:29px;display:block;object-fit:contain}
