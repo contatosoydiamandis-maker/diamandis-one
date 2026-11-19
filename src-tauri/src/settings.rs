@@ -69,3 +69,23 @@ fn validate_settings(settings: &AppSettings) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_settings, AppSettings};
+
+    #[test]
+    fn defaults_are_valid_and_local_first() {
+        let settings = AppSettings::default();
+        assert_eq!(settings.theme, "dark");
+        assert!(settings.confirm_before_delete);
+        assert!(validate_settings(&settings).is_ok());
+    }
+
+    #[test]
+    fn rejects_unknown_themes() {
+        let mut settings = AppSettings::default();
+        settings.theme = "neon".into();
+        assert!(validate_settings(&settings).is_err());
+    }
+}
