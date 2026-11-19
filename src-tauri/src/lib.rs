@@ -71,7 +71,7 @@ fn validate_folder_name(name: &str) -> Result<&str, String> {
     let reserved_stem = clean.split('.').next().unwrap_or("").trim().to_ascii_uppercase();
     let reserved_device = matches!(reserved_stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
         || (["COM", "LPT"].iter().any(|prefix| {
-            reserved_stem.strip_prefix(prefix)
+            reserved_stem.strip_prefix(*prefix)
                 .and_then(|suffix| suffix.parse::<u8>().ok())
                 .is_some_and(|number| (1..=9).contains(&number))
         }));
