@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "prepare:assets": "node scripts/prepare-assets.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "2.0.0",
