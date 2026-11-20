@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Copy, Gamepad2, Heart, LoaderCircle, RefreshCw, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { Copy, FolderOpen, Gamepad2, Heart, LoaderCircle, RefreshCw, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 
 type Game = { name: string; source: string; path: string };
@@ -27,6 +27,7 @@ export default function GameHub() {
   const [favorites, setFavorites] = useState<string[]>(readFavorites);
   const [showFavorites, setShowFavorites] = useState(false);
   const [copied, setCopied] = useState("");
+  const [openingPath, setOpeningPath] = useState("");
 
   const scan = useCallback(async (force = false) => {
     if (!force && cachedGames && Date.now() - cachedAt < 45_000) {
@@ -65,6 +66,18 @@ export default function GameHub() {
     catch { setError("Não foi possível copiar o caminho. Selecione o texto do caminho no cartão."); }
   };
 
+  const openGameFolder = async (path: string) => {
+    setOpeningPath(path);
+    setError("");
+    try {
+      await invoke("open_game_folder", { path });
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setOpeningPath("");
+    }
+  };
+
   const counts = useMemo(() => ({
     steam: games.filter(game => game.source === "Steam").length,
     epic: games.filter(game => game.source === "Epic Games").length,
@@ -100,7 +113,7 @@ export default function GameHub() {
       filtered.length ? <div className="gamehub-grid">{filtered.map(game => <article className="game-card" key={game.path}>
         <div className="game-card-cover"><Gamepad2 size={25}/><span>{game.source}</span></div>
         <div className="game-card-main"><strong title={game.name}>{game.name}</strong><span className="game-card-platform">{game.source} <i/> INSTALADO</span><code title={game.path}>{game.path}</code></div>
-        <div className="game-card-actions"><button className={favorites.includes(game.path) ? "game-icon-button favorite" : "game-icon-button"} onClick={() => toggleFavorite(game.path)} title="Adicionar aos favoritos"><Heart size={15} fill={favorites.includes(game.path) ? "currentColor" : "none"}/></button><button className="game-icon-button" onClick={() => void copyPath(game.path)} title="Copiar caminho"><Copy size={15}/></button></div>
+        <div className="game-card-actions"><button className={favorites.includes(game.path) ? "game-icon-button favorite" : "game-icon-button"} onClick={() => toggleFavorite(game.path)} title="Adicionar aos favoritos"><Heart size={15} fill={favorites.includes(game.path) ? "currentColor" : "none"}/></button><button className="game-icon-button" onClick={() => void copyPath(game.path)} title="Copiar caminho"><Copy size={15}/></button><button className="game-icon-button" onClick={() => void openGameFolder(game.path)} title="Abrir pasta de instalação" disabled={openingPath === game.path}><FolderOpen size={15}/></button></div>
         {copied === game.path && <span className="game-copy-feedback">Caminho copiado</span>}
       </article>)}</div> :
       <div className="gamehub-empty"><Gamepad2 size={31}/><strong>{games.length ? "Nenhum jogo corresponde à busca" : "Sua biblioteca ainda está vazia"}</strong><span>{games.length ? "Experimente outro nome ou remova os filtros." : "O GameHub procura instalações conhecidas de Steam, Epic Games e GOG."}</span>{games.length > 0 && <button className="secondary-button" onClick={() => {setQuery("");setSource("Todos");setShowFavorites(false);}}>Limpar filtros</button>}</div>}
