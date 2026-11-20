@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 type SystemMetrics = {
   cpuUsagePercent: number | null;
-  logicalCores: number;
+  logicalCores: number | null;
   memoryTotalBytes: number;
   memoryAvailableBytes: number;
   storageTotalBytes: number | null;
@@ -113,7 +113,7 @@ export default function SystemDashboard() {
       </div>
       {error && <div className="system-metric-error" role="status">{error}. Algumas métricas podem não estar disponíveis neste ambiente.</div>}
       <div className="system-metric-grid">
-        <MetricCard icon={Cpu} label="PROCESSADOR" value={metrics?.cpuUsagePercent == null ? "Calculando…" : `${metrics.cpuUsagePercent.toFixed(0)}%`} detail={metrics ? `${metrics.logicalCores} processadores lógicos` : "Aguardando leitura do sistema"} percent={metrics?.cpuUsagePercent}/>
+        <MetricCard icon={Cpu} label="PROCESSADOR" value={metrics?.cpuUsagePercent == null ? "Calculando…" : `${metrics.cpuUsagePercent.toFixed(0)}%`} detail={metrics ? (metrics.logicalCores === null ? "Contagem de processadores indisponível" : `${metrics.logicalCores} processadores lógicos`) : "Aguardando leitura do sistema"} percent={metrics?.cpuUsagePercent}/>
         <MetricCard icon={MemoryStick} label="MEMÓRIA RAM" value={metrics ? formatBytes(memoryUsed) : "Carregando…"} detail={metrics ? `${formatBytes(metrics.memoryAvailableBytes)} disponíveis de ${formatBytes(metrics.memoryTotalBytes)}` : "Aguardando leitura do sistema"} percent={memoryPercent}/>
         <MetricCard icon={HardDrive} label="ARMAZENAMENTO" value={storageUsed === null ? "Indisponível" : formatBytes(storageUsed)} detail={storageUsed === null ? "O Windows não retornou dados da unidade do sistema" : `${formatBytes(metrics!.storageFreeBytes!)} livres de ${formatBytes(metrics!.storageTotalBytes!)}`} percent={storagePercent}/>
         <MetricCard icon={Activity} label="GPU" value="Não disponível" detail="Leitura de GPU será adicionada com suporte por fabricante." unavailable/>
