@@ -260,3 +260,11 @@ button{ -webkit-tap-highlight-color:transparent }
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+
+/* Save Center: safe catalog removal */
+.save-game-item{display:flex;align-items:center;gap:5px;min-width:0}
+.save-game-item .save-game-row{flex:1;min-width:0}
+.save-remove-button{flex:0 0 29px;color:#a88e99}
+.save-remove-button:hover{border-color:#a45e70;color:#f0a9b8;background:#2c1b25}
+:root[data-theme="light"] .save-remove-button{background:#fff;color:#866b79}
