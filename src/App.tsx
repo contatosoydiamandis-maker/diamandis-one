@@ -174,8 +174,9 @@ function FileManager() {
     try {
       const data = await invoke<Listing>("list_directory", { path: target || null, offset: requestedPage * PAGE_SIZE, limit: PAGE_SIZE });
       setListing(data); setPath(data.path); setPage(requestedPage);
-      if (preferencesRef.current.openLastFolder) {
+      if (preferencesRef.current.openLastFolder && preferencesRef.current.lastFolder !== data.path) {
         const next = { ...preferencesRef.current, lastFolder: data.path };
+        preferencesRef.current = next;
         setPreferences(next);
         void invoke("save_settings", { settings: next }).catch(() => {});
       }
