@@ -13,6 +13,7 @@ import { setThemePreference } from "./theme";
 import GameHub from "./modules/GameHub";
 import Settings from "./modules/Settings";
 import SaveCenter from "./modules/SaveCenter";
+import SystemDashboard from "./modules/SystemDashboard";
 
 type NavItem = { id: ModuleId; label: string; icon: LucideIcon; group: string };
 
@@ -122,6 +123,8 @@ function App() {
               <div className="hero-copy"><div className="hero-tag"><Zap size={13}/> UM HUB. MÚLTIPLAS POSSIBILIDADES.</div><h2>Seu Windows,<br/><em>do seu jeito.</em></h2><p>Organização, produtividade e universo gamer reunidos em uma experiência única.</p><button className="primary-button" onClick={() => setActive("files")}>Explorar módulos <ArrowUpRight size={16}/></button></div>
               <div className="hero-art"><div className="ring ring-one"/><div className="ring ring-two"/><div className="hero-glyph"><Boxes size={62} strokeWidth={1}/></div><div className="float-chip chip-a"><FolderKanban size={15}/> Arquivos</div><div className="float-chip chip-b"><Gamepad2 size={15}/> GameHub</div><div className="float-chip chip-c"><Wrench size={15}/> Toolbox</div></div>
             </section>
+
+            <SystemDashboard/>
 
             <div className="section-title"><div><h3>Seu workspace</h3><p>Escolha por onde começar</p></div><span className="section-count">03 MÓDULOS</span></div>
             <section className="module-grid">
