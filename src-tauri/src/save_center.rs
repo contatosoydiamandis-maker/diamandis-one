@@ -338,7 +338,7 @@ pub async fn restore_save_backup(app: AppHandle, backup_id: String, game_id: Str
 
 #[cfg(test)]
 mod tests {
-    use super::{collect_hashes, copy_tree};
+    use super::{collect_hashes, copy_tree, tree_stats};
     use std::{fs, time::{SystemTime, UNIX_EPOCH}};
 
     fn temp_root() -> std::path::PathBuf {
@@ -356,6 +356,19 @@ mod tests {
         copy_tree(&source, &target, &mut stats).unwrap();
         assert_eq!(fs::read(target.join("nested/save.dat")).unwrap(), b"save-data");
         assert_eq!(stats, (9, 1));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn measures_the_final_payload_instead_of_source_metadata() {
+        let root = temp_root();
+        let payload = root.join("payload");
+        fs::create_dir_all(payload.join("nested")).unwrap();
+        fs::write(payload.join("nested/one.dat"), b"12345").unwrap();
+        fs::write(payload.join("two.dat"), b"678").unwrap();
+
+        assert_eq!(tree_stats(&payload).unwrap(), (8, 2));
+
         fs::remove_dir_all(root).unwrap();
     }
 
