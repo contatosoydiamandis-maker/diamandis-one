@@ -274,46 +274,111 @@ function Toolbox() {
   const [jsonValue, setJsonValue] = useState("");
   const [jsonResult, setJsonResult] = useState("");
   const [jsonError, setJsonError] = useState("");
+  const [base64Input, setBase64Input] = useState("");
+  const [base64Output, setBase64Output] = useState("");
+  const [base64Error, setBase64Error] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+  const [urlOutput, setUrlOutput] = useState("");
+  const [hashInput, setHashInput] = useState("");
+  const [hashOutput, setHashOutput] = useState("");
+  const [hashError, setHashError] = useState("");
   const [copied, setCopied] = useState("");
-  const transform = async (value: string, key: string) => {
-    setTextValue(value);
+  const [uuid, setUuid] = useState("");
+  const [jsonMode, setJsonMode] = useState<"pretty" | "compact">("pretty");
+
+  const copy = async (value: string, key: string) => {
     try { await navigator.clipboard.writeText(value); setCopied(key); window.setTimeout(() => setCopied(""), 1600); }
     catch { setCopied("error"); }
   };
+  const transform = (value: string) => setTextValue(value);
   const formatJson = () => {
-    try { setJsonResult(JSON.stringify(JSON.parse(jsonValue), null, 2)); setJsonError(""); }
-    catch (e) { setJsonResult(""); setJsonError(e instanceof Error ? e.message : "JSON inválido."); }
+    try {
+      const parsed = JSON.parse(jsonValue);
+      setJsonResult(jsonMode === "pretty" ? JSON.stringify(parsed, null, 2) : JSON.stringify(parsed));
+      setJsonError("");
+    } catch (e) { setJsonResult(""); setJsonError(e instanceof Error ? e.message : "JSON inválido."); }
   };
-  const copyJson = async () => {
-    try { await navigator.clipboard.writeText(jsonResult); setCopied("json"); window.setTimeout(() => setCopied(""), 1600); }
-    catch { setJsonError("Não foi possível copiar para a área de transferência."); }
+  const encodeBase64 = () => {
+    try {
+      const bytes = new TextEncoder().encode(base64Input);
+      let binary = "";
+      bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+      setBase64Output(btoa(binary)); setBase64Error("");
+    } catch { setBase64Error("Não foi possível codificar este conteúdo."); }
   };
-  const words = textValue.trim() ? textValue.trim().split(/\s+/).length : 0;
+  const decodeBase64 = () => {
+    try {
+      const binary = atob(base64Input.trim());
+      const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+      setBase64Output(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); setBase64Error("");
+    } catch { setBase64Output(""); setBase64Error("Base64 inválido ou conteúdo não codificado em UTF-8."); }
+  };
+  const generateHash = async () => {
+    setHashError(""); setHashOutput("");
+    try {
+      if (!globalThis.crypto?.subtle) throw new Error("Web Crypto indisponível neste ambiente.");
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hashInput));
+      setHashOutput(Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join(""));
+    } catch (e) { setHashError(e instanceof Error ? e.message : "Falha ao calcular SHA-256."); }
+  };
+  const words = textValue.trim() ? textValue.trim().split(/\\s+/).length : 0;
   const copyLabel = (key: string) => copied === key ? <><Check size={14}/> Copiado</> : <><Copy size={14}/> Copiar</>;
   return <section className="toolbox">
-    <div className="toolbox-intro"><div className="module-icon"><Type size={21}/></div><div><h3>Ferramentas de texto</h3><p>Utilidades rápidas que funcionam localmente, sem enviar seus dados para a internet.</p></div></div>
+    <div className="toolbox-intro"><div className="module-icon"><Wrench size={21}/></div><div><h3>Ferramentas locais</h3><p>Utilitários rápidos para texto, dados e desenvolvimento. Todo o processamento acontece no seu computador.</p></div></div>
     <div className="toolbox-grid">
       <article className="tool-card text-tool-card">
         <div className="tool-card-heading"><div><span className="tool-kicker">01 / TEXTO</span><h3>Transformador de texto</h3></div><Type size={18}/></div>
         <textarea value={textValue} onChange={e => setTextValue(e.target.value)} placeholder="Digite ou cole seu texto aqui..." rows={7}/>
-        <div className="text-stats"><span>{words} palavras</span><span>{textValue.length} caracteres</span><span>{textValue.split(/\n/).length} linhas</span></div>
+        <div className="text-stats"><span>{words} palavras</span><span>{textValue.length} caracteres</span><span>{textValue.split(/\\n/).length} linhas</span></div>
         <div className="tool-actions">
-          <button onClick={() => void transform(textValue.toUpperCase(),"upper")}>MAIÚSCULAS</button>
-          <button onClick={() => void transform(textValue.toLowerCase(),"lower")}>minúsculas</button>
-          <button onClick={() => void transform(textValue.replace(/\s+/g," ").trim(),"clean")}>Limpar espaços</button>
-          <button className="copy-action" onClick={() => void transform(textValue,"text")}>{copyLabel("text")}</button>
+          <button onClick={() => transform(textValue.toLocaleUpperCase())}>MAIÚSCULAS</button>
+          <button onClick={() => transform(textValue.toLocaleLowerCase())}>minúsculas</button>
+          <button onClick={() => transform(textValue.replace(/\\s+/g," ").trim())}>Limpar espaços</button>
+          <button onClick={() => transform(textValue.replace(/^\\s+|\\s+$/gm,"").replace(/\\n{3,}/g,"\\n\\n"))}>Limpar linhas</button>
+          <button className="copy-action" onClick={() => void copy(textValue,"text")}>{copyLabel("text")}</button>
         </div>
-        {copied === "error" && <small className="tool-error">A área de transferência não está disponível.</small>}
       </article>
       <article className="tool-card json-tool-card">
         <div className="tool-card-heading"><div><span className="tool-kicker">02 / DESENVOLVIMENTO</span><h3>Formatador JSON</h3></div><Braces size={18}/></div>
-        <textarea value={jsonValue} onChange={e => setJsonValue(e.target.value)} placeholder={'Cole seu JSON aqui...'} rows={5}/>
-        <div className="tool-actions"><button className="primary-button compact" onClick={formatJson} disabled={!jsonValue.trim()}>Formatar JSON</button><button onClick={() => {setJsonValue("");setJsonResult("");setJsonError("");}}>Limpar</button></div>
+        <textarea value={jsonValue} onChange={e => setJsonValue(e.target.value)} placeholder="Cole seu JSON aqui..." rows={5}/>
+        <div className="tool-actions">
+          <button className={jsonMode === "pretty" ? "primary-button compact" : ""} onClick={() => setJsonMode("pretty")}>Formatar</button>
+          <button className={jsonMode === "compact" ? "primary-button compact" : ""} onClick={() => setJsonMode("compact")}>Minificar</button>
+          <button onClick={formatJson} disabled={!jsonValue.trim()}>Executar</button>
+          <button onClick={() => {setJsonValue("");setJsonResult("");setJsonError("");}}>Limpar</button>
+        </div>
         {jsonError && <div className="tool-error">{jsonError}</div>}
-        {jsonResult && <div className="json-output"><div><span>RESULTADO FORMATADO</span><button onClick={() => void copyJson()}>{copyLabel("json")}</button></div><pre>{jsonResult}</pre></div>}
+        {jsonResult && <div className="json-output"><div><span>RESULTADO</span><button onClick={() => void copy(jsonResult,"json")}>{copyLabel("json")}</button></div><pre>{jsonResult}</pre></div>}
+      </article>
+      <article className="tool-card">
+        <div className="tool-card-heading"><div><span className="tool-kicker">03 / CODIFICAÇÃO</span><h3>Base64</h3></div><Braces size={18}/></div>
+        <textarea value={base64Input} onChange={e => setBase64Input(e.target.value)} placeholder="Texto ou conteúdo Base64..." rows={5}/>
+        <div className="tool-actions"><button className="primary-button compact" onClick={encodeBase64} disabled={!base64Input}>Codificar</button><button onClick={decodeBase64} disabled={!base64Input}>Decodificar</button><button onClick={() => {setBase64Input("");setBase64Output("");setBase64Error("");}}>Limpar</button></div>
+        {base64Error && <div className="tool-error">{base64Error}</div>}
+        {base64Output && <div className="json-output"><div><span>RESULTADO</span><button onClick={() => void copy(base64Output,"base64")}>{copyLabel("base64")}</button></div><pre>{base64Output}</pre></div>}
+      </article>
+      <article className="tool-card">
+        <div className="tool-card-heading"><div><span className="tool-kicker">04 / WEB</span><h3>Codificador de URL</h3></div><FileSearch size={18}/></div>
+        <textarea value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="Digite o texto ou URL..." rows={5}/>
+        <div className="tool-actions"><button className="primary-button compact" onClick={() => setUrlOutput(encodeURIComponent(urlInput))} disabled={!urlInput}>Codificar</button><button onClick={() => {try {setUrlOutput(decodeURIComponent(urlInput));} catch {setUrlOutput("");setBase64Error("Sequência de URL inválida.");}}} disabled={!urlInput}>Decodificar</button><button onClick={() => {setUrlInput("");setUrlOutput("");}}>Limpar</button></div>
+        {urlOutput && <div className="json-output"><div><span>RESULTADO</span><button onClick={() => void copy(urlOutput,"url")}>{copyLabel("url")}</button></div><pre>{urlOutput}</pre></div>}
+      </article>
+      <article className="tool-card">
+        <div className="tool-card-heading"><div><span className="tool-kicker">05 / INTEGRIDADE</span><h3>Hash SHA-256</h3></div><ShieldCheck size={18}/></div>
+        <textarea value={hashInput} onChange={e => setHashInput(e.target.value)} placeholder="Digite o conteúdo para calcular o hash..." rows={4}/>
+        <div className="tool-actions"><button className="primary-button compact" onClick={() => void generateHash()} disabled={!hashInput}>Calcular hash</button><button onClick={() => {setHashInput("");setHashOutput("");setHashError("");}}>Limpar</button></div>
+        {hashError && <div className="tool-error">{hashError}</div>}
+        {hashOutput && <div className="json-output"><div><span>SHA-256</span><button onClick={() => void copy(hashOutput,"hash")}>{copyLabel("hash")}</button></div><pre>{hashOutput}</pre></div>}
+      </article>
+      <article className="tool-card">
+        <div className="tool-card-heading"><div><span className="tool-kicker">06 / UTILITÁRIOS</span><h3>Gerador de UUID</h3></div><Sparkles size={18}/></div>
+        <p>Gere identificadores UUID v4 aleatórios usando o gerador criptográfico do navegador.</p>
+        <div className="tool-actions"><button className="primary-button compact" onClick={() => setUuid(crypto.randomUUID())}>Gerar UUID</button>{uuid && <button onClick={() => void copy(uuid,"uuid")}>{copyLabel("uuid")}</button>}</div>
+        {uuid && <div className="json-output"><pre>{uuid}</pre></div>}
       </article>
     </div>
-    <div className="toolbox-note"><ShieldCheck size={15}/> Todo o processamento acontece no próprio aplicativo. Nada é enviado para servidores.</div>
+    {copied === "error" && <div className="tool-error">A área de transferência não está disponível neste ambiente.</div>}
+    <div className="toolbox-note"><ShieldCheck size={15}/> Processamento local • Nenhum conteúdo é enviado para servidores.</div>
   </section>;
 }
 
