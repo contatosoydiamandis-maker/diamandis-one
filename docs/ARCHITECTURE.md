@@ -1,57 +1,89 @@
 # Arquitetura do DIAMANDIS ONE
 
 ## Princípios
-1. Local-first: dados e operações permanecem na máquina do usuário.
-2. Modularidade: cada domínio possui UI, serviços e comandos próprios.
-3. Segurança: operações destrutivas exigem confirmação e preservação do estado anterior.
-4. Conectores isolados: launchers e adaptadores de jogos não contaminam o núcleo.
-5. Persistência simples até haver necessidade real de banco relacional.
 
-## Camadas
-- UI: React + TypeScript.
-- Desktop bridge: Tauri IPC e plugins de capacidade mínima.
-- Core: Rust.
-- Preferences: arquivo JSON em app_config_dir, com escrita temporária, sincronização em disco e substituição atômica compatível com Windows.
-- Theme: preferência escuro/claro/sistema; o modo sistema acompanha mudanças de aparência do Windows durante a execução.
-- System Dashboard: consulta CPU por deltas de `GetSystemTimes`, memória física por `GlobalMemoryStatusEx` e espaço da unidade do sistema por `GetDiskFreeSpaceExW`; métricas indisponíveis permanecem explicitamente ausentes, sem estimativas. A coleta ocorre fora da thread principal e a interface atualiza em intervalo controlado. GPU ainda não possui provedor nativo.
-- File Manager: leitura de diretórios e operações explícitas; exclusão via Lixeira do sistema.
-- GameHub: scanners somente leitura por launcher; abertura da pasta de instalação somente após canonicalização e confirmação de que o destino é um diretório, usando o gerenciador de arquivos nativo sem shell intermediário.
-- Save Center: catálogo local, cópias de segurança e restauração transacional por diretório.
+1. **Local-first:** dados e operações permanecem na máquina do usuário.
+2. **Modularidade:** cada domínio tem responsabilidades e interfaces explícitas.
+3. **Segurança por padrão:** entradas da interface são não confiáveis; alterações destrutivas exigem validação e confirmação.
+4. **Conectores isolados:** launchers e adaptadores de jogos não devem contaminar o núcleo.
+5. **Falha explícita:** sensores indisponíveis e operações incompletas nunca devem ser representados como sucesso.
+6. **Distribuição simples:** usuários finais instalam e executam o produto por interface gráfica, sem ferramentas de desenvolvimento.
 
-## Segurança do File Manager
-- Renomear valida nomes reservados e caracteres proibidos do Windows.
-- Copiar cria o destino sem sobrescrever arquivos existentes.
-- Mover usa rename do filesystem e não tenta fallback destrutivo entre volumes.
-- Excluir envia o item à Lixeira através da crate trash.
-- Links simbólicos são recusados nas operações de alteração.
+## Visão em camadas
 
-## GameHub inicial
-- Steam: bibliotecas e manifests appmanifest.
-- Epic Games: manifests .item.
-- GOG: diretórios de instalação conhecidos.
-- Descoberta é local e somente leitura. Xbox, EA e Ubisoft exigem conectores específicos e testes próprios.
+- **Interface:** React + TypeScript + Vite.
+- **Desktop bridge:** Tauri 2 IPC e permissões declaradas em `src-tauri/capabilities`.
+- **Núcleo:** Rust, responsável por filesystem, métricas nativas, persistência e integração com processos.
+- **Preferências:** JSON em `app_config_dir`, gravado por arquivo temporário e substituição atômica.
+- **Dados de usuário:** catálogo e backups do Save Center em `app_local_data_dir`.
 
-## Save Center
-- O catálogo inicial fica em app_local_data_dir/save-center/games.json.
-- Backups ficam em app_local_data_dir/save-center/backups/<game-id>/<backup-id>.
-- O MVP permite cadastrar qualquer pasta existente, sem modificar seu conteúdo.
-- A criação de backup copia arquivos, rejeita links simbólicos e grava hashes SHA-256 por arquivo.
-- A restauração prepara uma pasta temporária, verifica contagem, tamanho e hashes, preserva o save atual em .diamandis-pre-restore-* e só então troca os diretórios.
-- Backups antigos sem hashes continuam legíveis e usam a verificação estrutural anterior.
-- O diálogo nativo de seleção de pasta evita exigir que a pessoa digite caminhos manualmente.
-- As operações de cadastro, remoção, backup, restauração e gerenciamento de campanhas TOTK usam um lock de processo para impedir concorrência entre mutações.
-- Catálogo e configurações são gravados por substituição atômica; tamanho e quantidade de arquivos são medidos novamente no payload final antes da verificação.
-- A inicialização de campanha exige backup preventivo no backend antes de criar o processo do jogo.
+## Organização do código
 
-## Adaptador Zelda: TOTK Recomp
-- Configuração validada pela presença de `totk.exe`.
-- Importação copia `profile` para uma campanha gerenciada e não altera a origem.
-- Campanhas ficam sob `app_local_data_dir/totk-recomp/campaigns`.
-- A inicialização passa `TOTK_PROFILE_DIR` e exige backup preventivo no backend.
-- Backup/restauração de campanha são bloqueados quando `totk.exe` está ativo.
-- A compatibilidade de `TOTK_PROFILE_DIR` ainda depende de validação com a build real do Recomp.
+### Frontend
 
-## Próximos marcos
-- Validar o adaptador com uma instalação real do TOTK Recomp.
-- Executar testes físicos de instalação, execução, atualização e remoção em Windows limpo.
-- Versionar lockfiles para builds reproduzíveis.
+- `src/App.tsx`: navegação principal e File Manager.
+- `src/modules/`: módulos de domínio independentes.
+- `src/theme.ts`: aplicação e acompanhamento do tema.
+- `src/types.ts`: tipos compartilhados da navegação.
+- `src/styles.css`: tokens visuais, layout e estilos dos módulos.
+
+### Backend Rust
+
+- `lib.rs`: registro de comandos Tauri e listagem de diretórios.
+- `atomic_file.rs`: substituição de arquivos com proteção contra gravação parcial.
+- `file_ops.rs`: operações explícitas de arquivos e validação de nomes.
+- `gamehub.rs`: descoberta somente leitura e abertura de pastas de jogos.
+- `save_center.rs`: catálogo, hashes, backups, verificação e restauração.
+- `settings.rs`: validação e persistência de preferências.
+- `system_metrics.rs`: métricas nativas do sistema.
+- `totk_recomp.rs`: campanhas e integração isolada do TOTK Recomp.
+
+## Responsabilidades dos módulos
+
+### Dashboard
+
+CPU é calculada por deltas de `GetSystemTimes`; RAM usa `GlobalMemoryStatusEx`; armazenamento usa `GetDiskFreeSpaceExW`. Leituras acontecem no backend e fora da thread de interface. A UI limita a frequência de atualização e compartilha requisições simultâneas para não duplicar consultas. GPU permanece explicitamente indisponível até existir um provedor confiável.
+
+### File Manager
+
+A listagem é executada fora da thread principal, com paginação, filtros e ordenação no backend. Operações de alteração validam nomes e caminhos, recusam links simbólicos e não sobrescrevem destinos. Exclusão usa a Lixeira do sistema.
+
+### GameHub
+
+Steam, Epic Games e GOG são descobertos por leitura de manifests e diretórios conhecidos. A varredura não inicia launchers nem altera instalações. Requisições simultâneas de descoberta são compartilhadas no frontend e o resultado recente é mantido em cache curto. Favoritos são locais ao perfil do navegador/WebView.
+
+### Save Center
+
+O catálogo fica em `app_local_data_dir/save-center/games.json`; backups ficam em `app_local_data_dir/save-center/backups/<game-id>/<backup-id>`. A criação copia arquivos, recusa links simbólicos e gera SHA-256 por arquivo. A verificação confere estrutura, tamanho, contagem e hashes; backups legados sem manifesto recebem verificação estrutural identificada como tal. A restauração prepara e verifica um payload temporário e preserva o save atual antes da troca.
+
+### Adaptador Zelda: TOTK Recomp
+
+A instalação é identificada por `totk.exe`. Importação copia o perfil para uma campanha gerenciada, sem modificar a origem. A inicialização exige backup preventivo e define `TOTK_PROFILE_DIR`. Compatibilidade dessa variável precisa ser confirmada com uma build real do Recomp.
+
+## Segurança e concorrência
+
+- Permissões Tauri são mínimas e explícitas.
+- Caminhos fornecidos pela interface são validados novamente no Rust.
+- Links simbólicos são recusados em operações sensíveis.
+- Catálogos e preferências usam gravação atômica.
+- Operações mutáveis do Save Center e do adaptador TOTK compartilham lock de processo.
+- A UI nunca deve substituir validações do backend por validações apenas visuais.
+- Segredos, tokens e dados privados não pertencem ao repositório.
+
+## Build e qualidade
+
+- Node.js 22+ e npm 10+.
+- `npm run check`: TypeScript e build de produção.
+- `cargo test --manifest-path src-tauri/Cargo.toml --all-targets`: testes nativos.
+- `npm run tauri build`: prepara assets e gera o pacote desktop.
+- CI valida frontend, testes Rust e instalador NSIS x64.
+
+Lockfiles ainda precisam ser versionados. Até lá, os builds de CI não são totalmente reproduzíveis byte a byte.
+
+## Próximos marcos técnicos
+
+- Versionar `package-lock.json` e `src-tauri/Cargo.lock`, então migrar para `npm ci` e `cargo --locked`.
+- Validar instalação, atualização e remoção em Windows limpo.
+- Validar TOTK Recomp com instalação real.
+- Medir inicialização, memória em repouso e operações em diretórios grandes.
+- Expandir conectores do GameHub com testes específicos por launcher.

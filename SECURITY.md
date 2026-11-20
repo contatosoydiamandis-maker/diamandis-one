@@ -1,20 +1,22 @@
-# Security Policy
+# Política de segurança
 
-## Supported versions
+O DIAMANDIS ONE está em desenvolvimento pré-alpha. Correções de segurança são tratadas prioritariamente na branch padrão (`main`).
 
-DIAMANDIS ONE is in early development. Until a stable release is published, security fixes are handled on the default branch (`main`).
+## Reportar uma vulnerabilidade
 
-## Reporting a vulnerability
+**Não publique detalhes exploráveis em issues públicas, discussões ou Pull Requests.**
 
-Please do not publish exploitable vulnerability details in a public issue.
+Quando o recurso estiver disponível, use a opção **Report a vulnerability** na aba Security do repositório. Informe:
 
-Use GitHub's **Report a vulnerability** feature in the repository's Security tab when available. Include:
+- descrição objetiva e impacto potencial;
+- passos para reproduzir ou prova de conceito não destrutiva;
+- versão, commit, sistema operacional e configuração afetados;
+- possíveis medidas de mitigação.
 
-- A clear description and potential impact.
-- Steps to reproduce or a proof of concept.
-- Affected version, commit, operating system, and configuration.
-- Any suggested mitigation.
+Aguarde um prazo razoável para investigação e correção antes de divulgar publicamente.
 
-Please allow maintainers reasonable time to investigate and prepare a fix before public disclosure.
+Nunca inclua senhas, tokens, chaves privadas, arquivos pessoais ou outros dados sensíveis no relato.
 
-Do not include passwords, access tokens, personal files, or other private data in reports.
+## Escopo especialmente sensível
+
+Como o aplicativo gerencia arquivos e backups locais, relatos envolvendo traversal de caminhos, links simbólicos, sobrescrita acidental, restauração de backup, execução de processos, permissões Tauri e exposição de dados locais são especialmente importantes.

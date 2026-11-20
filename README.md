@@ -35,7 +35,15 @@
 
 A versão distribuída será instalada por um assistente gráfico do Windows. Usuários finais não precisarão instalar Node.js ou Rust, nem abrir CMD ou PowerShell. Consulte [Instalação e uso](docs/INSTALLATION.md). O artefato de CI atual é experimental e não representa uma versão estável.
 
-O pipeline de validação é executado automaticamente em Pull Requests direcionados à `main` e em pushes na `main`. Os pacotes gerados pelo CI são artefatos temporários de teste, não releases públicas. O workflow de publicação é separado e só prepara um rascunho de pré-release quando uma tag de versão é criada. Nenhuma versão será considerada estável sem testes reais em Windows limpo.
+O pipeline de validação é executado automaticamente em Pull Requests direcionados à `main` e em pushes na `main`. Os pacotes gerados pelo CI são artefatos temporários de teste, não releases públicas. O workflow de distribuição é separado e só prepara um rascunho de pré-release quando uma tag `v*` é criada. Nenhuma versão será considerada estável sem testes reais em Windows limpo.
+
+### Qualidade e reprodutibilidade
+
+- Use Node.js 22 ou superior e npm 10 ou superior para desenvolvimento.
+- `npm run check` executa a verificação TypeScript e o build de produção.
+- `npm run tauri build` prepara o ícone automaticamente antes de compilar o aplicativo.
+- O CI executa os testes nativos Rust em todos os targets e publica instaladores como artefatos temporários.
+- Os lockfiles ainda precisam ser adicionados ao repositório; até isso acontecer, as instalações de dependências não são totalmente reproduzíveis.
 
 ## Desenvolvimento
 
@@ -77,7 +85,8 @@ Use os modelos de issue para reportar bugs e sugerir funcionalidades. Leia tamb�
 2. Validar o adaptador TOTK Recomp com instalação real e confirmar `TOTK_PROFILE_DIR`.
 3. Testar instalação, inicialização, atualização manual e remoção em Windows limpo.
 4. Gerar e versionar lockfiles para builds reproduzíveis.
-5. Expandir conectores do GameHub e melhorar operações em lote no File Manager.\n6. Expandir monitoramento de GPU e Toolbox com ferramentas adicionais verificáveis.
+5. Expandir conectores do GameHub e melhorar operações em lote no File Manager.
+6. Expandir monitoramento de GPU e Toolbox com ferramentas adicionais verificáveis.
 
 ## Licença
 
