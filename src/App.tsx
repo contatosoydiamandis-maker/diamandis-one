@@ -165,7 +165,7 @@ function FileManager() {
       }
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); }
-  }, [preferences]);
+  }, []);
 
   useEffect(() => {
     let active = true;
