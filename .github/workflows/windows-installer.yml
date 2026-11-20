@@ -40,6 +40,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Prepare desktop assets
+        run: npm run prepare:assets
+
       - name: Run native tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --all-targets
 
