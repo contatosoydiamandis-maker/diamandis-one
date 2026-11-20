@@ -26,7 +26,7 @@
 | File Manager | Navegação, filtro, criação, renomeação, cópia, movimentação e Lixeira |
 | Configurações | Tema escuro/claro/sistema e preferências persistentes |
 | Toolbox | Transformador de texto, JSON, Base64, URL, SHA-256 e UUID offline |
-| GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG |
+| GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG; favoritos e abertura da pasta de instalação |
 | Save Center | Cadastro manual de pastas, backups locais, histórico e restauração protegida |
 | Seleção de pastas | Diálogo nativo do Windows via Tauri |
 | Build/instalador | CI gera instalador NSIS x64; instalação física ainda não validada em máquina Windows limpa |
