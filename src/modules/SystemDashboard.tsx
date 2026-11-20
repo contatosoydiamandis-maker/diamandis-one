@@ -11,6 +11,17 @@ type SystemMetrics = {
   storageFreeBytes: number | null;
 };
 
+let metricsRequest: Promise<SystemMetrics> | null = null;
+
+function loadMetrics(): Promise<SystemMetrics> {
+  if (!metricsRequest) {
+    metricsRequest = invoke<SystemMetrics>("get_system_metrics").finally(() => {
+      metricsRequest = null;
+    });
+  }
+  return metricsRequest;
+}
+
 const formatBytes = (bytes: number) => {
   if (!Number.isFinite(bytes) || bytes < 0) return "Indisponível";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -60,7 +71,7 @@ export default function SystemDashboard() {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const result = await invoke<SystemMetrics>("get_system_metrics");
+      const result = await loadMetrics();
       setMetrics(result);
       setError("");
     } catch (reason) {

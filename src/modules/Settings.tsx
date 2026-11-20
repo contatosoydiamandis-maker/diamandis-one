@@ -60,9 +60,9 @@ export default function Settings() {
     <article className="settings-card">
       <div className="settings-heading"><div><span className="tool-kicker">APARÊNCIA</span><h3>Tema do aplicativo</h3><p>Escolha como o DIAMANDIS ONE deve aparecer.</p></div></div>
       <div className="theme-options">
-        <button className={value.theme === "dark" ? "theme-option selected" : "theme-option"} onClick={() => update("theme", "dark")}><Moon size={19}/><strong>Escuro</strong><span>Contraste suave</span></button>
-        <button className={value.theme === "light" ? "theme-option selected" : "theme-option"} onClick={() => update("theme", "light")}><Sun size={19}/><strong>Claro</strong><span>Ambiente iluminado</span></button>
-        <button className={value.theme === "system" ? "theme-option selected" : "theme-option"} onClick={() => update("theme", "system")}><Monitor size={19}/><strong>Sistema</strong><span>Seguir o Windows</span></button>
+        <button className={value.theme === "dark" ? "theme-option selected" : "theme-option"} aria-pressed={value.theme === "dark"} onClick={() => update("theme", "dark")}><Moon size={19}/><strong>Escuro</strong><span>Contraste suave</span></button>
+        <button className={value.theme === "light" ? "theme-option selected" : "theme-option"} aria-pressed={value.theme === "light"} onClick={() => update("theme", "light")}><Sun size={19}/><strong>Claro</strong><span>Ambiente iluminado</span></button>
+        <button className={value.theme === "system" ? "theme-option selected" : "theme-option"} aria-pressed={value.theme === "system"} onClick={() => update("theme", "system")}><Monitor size={19}/><strong>Sistema</strong><span>Seguir o Windows</span></button>
       </div>
     </article>
 
@@ -74,7 +74,7 @@ export default function Settings() {
     </article>
 
     <div className="settings-footer">
-      <div className={error ? "settings-feedback error" : "settings-feedback"}>{error || message}</div>
+      <div className={error ? "settings-feedback error" : "settings-feedback"} role={error ? "alert" : "status"}>{error || message}</div>
       <button className="primary-button compact" onClick={() => void save()} disabled={saving}>{saving ? <LoaderCircle className="spin" size={14}/> : <Check size={14}/>} Salvar preferências</button>
     </div>
   </section>;

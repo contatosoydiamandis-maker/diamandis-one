@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Copy, FolderOpen, Gamepad2, Heart, LoaderCircle, RefreshCw, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -6,6 +6,7 @@ type Game = { name: string; source: string; path: string };
 type SourceFilter = "Todos" | "Steam" | "Epic Games" | "GOG";
 let cachedGames: Game[] | null = null;
 let cachedAt = 0;
+let scanPromise: Promise<Game[]> | null = null;
 
 const readFavorites = (): string[] => {
   try {
@@ -28,20 +29,32 @@ export default function GameHub() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [copied, setCopied] = useState("");
   const [openingPath, setOpeningPath] = useState("");
+  const copyTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+  }, []);
 
   const scan = useCallback(async (force = false) => {
     if (!force && cachedGames && Date.now() - cachedAt < 45_000) {
       setGames(cachedGames);
       return;
     }
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
+    const request = scanPromise ?? invoke<Game[]>("scan_games");
+    scanPromise = request;
     try {
-      const result = await invoke<Game[]>("scan_games");
+      const result = await request;
       cachedGames = result;
       cachedAt = Date.now();
       setGames(result);
-    } catch (e) { setError(String(e)); }
-    finally { setLoading(false); }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      if (scanPromise === request) scanPromise = null;
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { void scan(); }, [scan]);
@@ -62,8 +75,17 @@ export default function GameHub() {
   };
 
   const copyPath = async (path: string) => {
-    try { await navigator.clipboard.writeText(path); setCopied(path); window.setTimeout(() => setCopied(""), 1400); }
-    catch { setError("Não foi possível copiar o caminho. Selecione o texto do caminho no cartão."); }
+    try {
+      await navigator.clipboard.writeText(path);
+      setCopied(path);
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+      copyTimer.current = window.setTimeout(() => {
+        setCopied("");
+        copyTimer.current = null;
+      }, 1400);
+    } catch {
+      setError("Não foi possível copiar o caminho. Selecione o texto do caminho no cartão.");
+    }
   };
 
   const openGameFolder = async (path: string) => {
@@ -103,17 +125,17 @@ export default function GameHub() {
     </div>
 
     <div className="gamehub-controls">
-      <label className="gamehub-search"><Search size={15}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar por nome do jogo..."/></label>
+      <label className="gamehub-search"><Search size={15}/><input aria-label="Buscar jogos por nome" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar por nome do jogo..."/></label>
       <button className={showFavorites ? "gamehub-favorites active" : "gamehub-favorites"} onClick={() => setShowFavorites(value => !value)}><Heart size={14} fill={showFavorites ? "currentColor" : "none"}/> Favoritos <span>{favorites.length}</span></button>
       <span className="gamehub-results">{filtered.length} {filtered.length === 1 ? "resultado" : "resultados"}</span>
     </div>
 
-    {error && <div className="file-message error-message">{error}</div>}
+    {error && <div className="file-message error-message" role="alert">{error}</div>}
     {loading ? <div className="gamehub-empty"><LoaderCircle className="spin" size={25}/><strong>Mapeando suas bibliotecas...</strong><span>Buscando instalações conhecidas sem abrir seus launchers.</span></div> :
       filtered.length ? <div className="gamehub-grid">{filtered.map(game => <article className="game-card" key={game.path}>
         <div className="game-card-cover"><Gamepad2 size={25}/><span>{game.source}</span></div>
         <div className="game-card-main"><strong title={game.name}>{game.name}</strong><span className="game-card-platform">{game.source} <i/> INSTALADO</span><code title={game.path}>{game.path}</code></div>
-        <div className="game-card-actions"><button className={favorites.includes(game.path) ? "game-icon-button favorite" : "game-icon-button"} onClick={() => toggleFavorite(game.path)} title="Adicionar aos favoritos"><Heart size={15} fill={favorites.includes(game.path) ? "currentColor" : "none"}/></button><button className="game-icon-button" onClick={() => void copyPath(game.path)} title="Copiar caminho"><Copy size={15}/></button><button className="game-icon-button" onClick={() => void openGameFolder(game.path)} title="Abrir pasta de instalação" disabled={openingPath === game.path}><FolderOpen size={15}/></button></div>
+        <div className="game-card-actions"><button className={favorites.includes(game.path) ? "game-icon-button favorite" : "game-icon-button"} onClick={() => toggleFavorite(game.path)} title="Adicionar aos favoritos" aria-label={favorites.includes(game.path) ? "Remover dos favoritos" : "Adicionar aos favoritos"}><Heart size={15} fill={favorites.includes(game.path) ? "currentColor" : "none"}/></button><button className="game-icon-button" onClick={() => void copyPath(game.path)} title="Copiar caminho" aria-label="Copiar caminho da instalação"><Copy size={15}/></button><button className="game-icon-button" onClick={() => void openGameFolder(game.path)} title="Abrir pasta de instalação" aria-label="Abrir pasta de instalação" disabled={openingPath === game.path}><FolderOpen size={15}/></button></div>
         {copied === game.path && <span className="game-copy-feedback">Caminho copiado</span>}
       </article>)}</div> :
       <div className="gamehub-empty"><Gamepad2 size={31}/><strong>{games.length ? "Nenhum jogo corresponde à busca" : "Sua biblioteca ainda está vazia"}</strong><span>{games.length ? "Experimente outro nome ou remova os filtros." : "O GameHub procura instalações conhecidas de Steam, Epic Games e GOG."}</span>{games.length > 0 && <button className="secondary-button" onClick={() => {setQuery("");setSource("Todos");setShowFavorites(false);}}>Limpar filtros</button>}</div>}
