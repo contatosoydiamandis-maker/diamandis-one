@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Archive, CheckCircle2, Clock3, FolderOpen, HardDrive, LoaderCircle, Plus, RefreshCw, RotateCcw, ShieldCheck } from "lucide-react";
+import { Archive, CheckCircle2, Clock3, FolderOpen, HardDrive, LoaderCircle, Plus, RefreshCw, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -126,6 +126,20 @@ export default function SaveCenter() {
     finally { setWorkingId(""); }
   };
 
+  const removeGame = async (game: SaveGame) => {
+    const accepted = window.confirm(`Remover o cadastro de "${game.name}" do Save Center? Os arquivos originais e os backups armazenados não serão apagados.`);
+    if (!accepted) return;
+    setError(""); setNotice("");
+    try {
+      await invoke("remove_save_game", { gameId: game.id });
+      const nextGameId = games.find(item => item.id !== game.id)?.id || "";
+      selectedGameRef.current = nextGameId;
+      setSelectedGame(nextGameId);
+      setNotice("Cadastro removido. Os arquivos originais e backups foram preservados.");
+      await refresh(nextGameId || undefined);
+    } catch (e) { setError(String(e)); }
+  };
+
   const restore = async (backup: SaveBackup) => {
     if (!selected) return;
     const accepted = window.confirm(`Antes de continuar, feche completamente o jogo para evitar que ele sobrescreva os arquivos restaurados.\n\nRestaurar o backup de ${formatDate(backup.createdAt)}? O save atual será preservado em uma pasta de segurança antes da troca.`);
@@ -169,9 +183,12 @@ export default function SaveCenter() {
 
     <div className="save-center-layout">
       <div className="save-games-panel">
-        {games.length ? games.map(game => <button key={game.id} className={selectedGame === game.id ? "save-game-row active" : "save-game-row"} onClick={() => { selectedGameRef.current = game.id; setSelectedGame(game.id); void refresh(game.id); }}>
-          <span className="save-game-icon"><Archive size={17}/></span><span className="save-game-copy"><strong>{game.name}</strong><small title={game.savePath}>{game.savePath}</small></span><span className="save-game-arrow">›</span>
-        </button>) : <div className="save-empty"><FolderOpen size={24}/><strong>Nenhum jogo cadastrado</strong><span>Adicione a pasta onde o jogo guarda seus arquivos de progresso.</span></div>}
+        {games.length ? games.map(game => <div className="save-game-item" key={game.id}>
+          <button className={selectedGame === game.id ? "save-game-row active" : "save-game-row"} onClick={() => { selectedGameRef.current = game.id; setSelectedGame(game.id); void refresh(game.id); }}>
+            <span className="save-game-icon"><Archive size={17}/></span><span className="save-game-copy"><strong>{game.name}</strong><small title={game.savePath}>{game.savePath}</small></span><span className="save-game-arrow">›</span>
+          </button>
+          <button className="game-icon-button save-remove-button" title="Remover cadastro, preservando arquivos e backups" onClick={() => void removeGame(game)}><Trash2 size={14}/></button>
+        </div>) : <div className="save-empty"><FolderOpen size={24}/><strong>Nenhum jogo cadastrado</strong><span>Adicione a pasta onde o jogo guarda seus arquivos de progresso.</span></div>}
         <button className="save-add-toggle" onClick={() => setAdding(value => !value)}><Plus size={15}/> Adicionar jogo manualmente</button>
       </div>
 
