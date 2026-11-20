@@ -13,6 +13,7 @@
 - Core: Rust.
 - Preferences: arquivo JSON em app_config_dir, com escrita temporária, sincronização em disco e substituição atômica compatível com Windows.
 - Theme: preferência escuro/claro/sistema; o modo sistema acompanha mudanças de aparência do Windows durante a execução.
+- System Dashboard: consulta CPU por deltas de `GetSystemTimes`, memória física por `GlobalMemoryStatusEx` e espaço da unidade do sistema por `GetDiskFreeSpaceExW`; métricas indisponíveis permanecem explicitamente ausentes, sem estimativas. A coleta ocorre fora da thread principal e a interface atualiza em intervalo controlado. GPU ainda não possui provedor nativo.
 - File Manager: leitura de diretórios e operações explícitas; exclusão via Lixeira do sistema.
 - GameHub: scanners somente leitura por launcher; abertura da pasta de instalação somente após canonicalização e confirmação de que o destino é um diretório, usando o gerenciador de arquivos nativo sem shell intermediário.
 - Save Center: catálogo local, cópias de segurança e restauração transacional por diretório.
