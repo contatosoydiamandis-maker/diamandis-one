@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, LoaderCircle, Moon, Monitor, Sun } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { setThemePreference } from "../theme";
 
 type SettingsValue = {
   theme: "dark" | "light" | "system";
@@ -35,7 +36,7 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = value.theme;
+    setThemePreference(value.theme);
   }, [value.theme]);
 
   const update = <K extends keyof SettingsValue>(key: K, next: SettingsValue[K]) =>
