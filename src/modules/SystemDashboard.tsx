@@ -86,7 +86,7 @@ export default function SystemDashboard() {
     let timeout: number | undefined;
     const poll = async () => {
       try {
-        const result = await invoke<SystemMetrics>("get_system_metrics");
+        const result = await loadMetrics();
         if (active) {
           setMetrics(result);
           setError("");

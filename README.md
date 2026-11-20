@@ -85,7 +85,8 @@ Use os modelos de issue para reportar bugs e sugerir funcionalidades. Leia tamb�
 2. Validar o adaptador TOTK Recomp com instalação real e confirmar `TOTK_PROFILE_DIR`.
 3. Testar instalação, inicialização, atualização manual e remoção em Windows limpo.
 4. Gerar e versionar lockfiles para builds reproduzíveis.
-5. Expandir conectores do GameHub e melhorar operações em lote no File Manager.\n6. Expandir monitoramento de GPU e Toolbox com ferramentas adicionais verificáveis.
+5. Expandir conectores do GameHub e melhorar operações em lote no File Manager.
+6. Expandir monitoramento de GPU e Toolbox com ferramentas adicionais verificáveis.
 
 ## Licença
 
