@@ -139,7 +139,7 @@ mod tests {
     #[test]
     fn calculates_cpu_usage_from_system_time_deltas() {
         let previous = CpuTimes { idle: 100, kernel: 200, user: 100 };
-        let current = CpuTimes { idle: 150, kernel: 300, user: 150 };
+        let current = CpuTimes { idle: 200, kernel: 300, user: 200 };
         assert_eq!(calculate_cpu_usage(previous, current), Some(50.0));
     }
 
