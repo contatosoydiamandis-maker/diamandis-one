@@ -12,7 +12,7 @@ struct CpuTimes {
 #[serde(rename_all = "camelCase")]
 pub struct SystemMetrics {
     pub cpu_usage_percent: Option<f64>,
-    pub logical_cores: usize,
+    pub logical_cores: Option<usize>,
     pub memory_total_bytes: u64,
     pub memory_available_bytes: u64,
     pub storage_total_bytes: Option<u64>,
@@ -102,7 +102,7 @@ fn collect() -> Result<SystemMetrics, String> {
 
     Ok(SystemMetrics {
         cpu_usage_percent,
-        logical_cores: std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1),
+        logical_cores: std::thread::available_parallelism().ok().map(|n| n.get()),
         memory_total_bytes: memory.total_phys,
         memory_available_bytes: memory.avail_phys,
         storage_total_bytes: if disk_ok { Some(total) } else { None },
