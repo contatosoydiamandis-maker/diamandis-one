@@ -67,8 +67,15 @@ fn validate_install(path: &Path) -> Result<PathBuf, String> {
 }
 fn safe_name(name: &str) -> Result<String, String> {
     let name = name.trim();
-    if name.is_empty() || name.len() > 80 || name.chars().any(|c| c.is_control() || ['<','>',':','"','/','\\','|','?','*'].contains(&c)) || name.ends_with('.') || name.ends_with(' ') {
-        return Err("Use um nome de campanha válido, com até 80 caracteres.".into());
+    let stem = name.split('.').next().unwrap_or("").trim().to_ascii_uppercase();
+    let reserved = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$" | "COM¹" | "COM²" | "COM³" | "LPT¹" | "LPT²" | "LPT³")
+        || ["COM", "LPT"].iter().any(|prefix| stem.strip_prefix(*prefix)
+            .and_then(|suffix| suffix.parse::<u8>().ok())
+            .is_some_and(|number| (1..=9).contains(&number)));
+    if name.is_empty() || name.len() > 80 || reserved
+        || name.chars().any(|c| c.is_control() || ['<','>',':','"','/','\\','|','?','*'].contains(&c))
+        || name.ends_with('.') || name.ends_with(' ') {
+        return Err("Use um nome de campanha válido para o Windows, com até 80 caracteres e sem nomes reservados.".into());
     }
     Ok(name.to_string())
 }
@@ -221,7 +228,7 @@ mod tests {
 
     #[test]
     fn rejects_empty_or_unsafe_campaign_names() {
-        for value in ["", "   ", "../fora", "C:\\temp", "nome|invalido", "nome?"] {
+        for value in ["", "   ", "../fora", "C:\\temp", "nome|invalido", "nome?", "CON", "NUL.txt", "COM1", "LPT9.log"] {
             assert!(safe_name(value).is_err(), "nome inseguro aceito: {value}");
         }
     }
