@@ -67,7 +67,7 @@ fn collect() -> Result<SystemMetrics, String> {
             let previous = CPU_TIMES.get_or_init(|| Mutex::new(None));
             match previous.lock() {
                 Ok(mut previous) => {
-                    let usage = previous.map(|old| calculate_cpu_usage(old, current));
+                    let usage = match *previous { Some(old) => calculate_cpu_usage(old, current), None => None };
                     *previous = Some(current);
                     usage
                 }
