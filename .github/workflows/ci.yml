@@ -59,8 +59,6 @@ jobs:
           workspaces: src-tauri -> target
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
-      - name: Prepare desktop assets
-        run: npm run prepare:assets
       - name: Run native core tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
       - name: Upload generated Cargo lockfile
