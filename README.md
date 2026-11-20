@@ -2,89 +2,82 @@
 
 **Um hub desktop local-first para Windows:** organização de arquivos, ferramentas de produtividade e gerenciamento da biblioteca gamer em um só lugar.
 
-> **Status: desenvolvimento ativo (pré-alpha).** A versão 0.1.1 já possui a interface desktop Tauri e um File Manager inicial com navegação real por diretórios e criação de pastas. Toolbox, GameHub e Save Center continuam em implementação. O build Windows e o instalador ainda precisam de validação em máquina Windows.
+> **Status: pré-alpha 0.2.0.** A base desktop inclui navegação de arquivos, operações controladas, preferências persistentes, descoberta inicial de jogos Steam/Epic/GOG e Save Center com backups SHA-256 e restauração protegida. O adaptador TOTK Recomp já oferece campanhas isoladas, importação por cópia e backup obrigatório antes de iniciar. A CI automatiza o build do frontend, os testes Rust e a geração do instalador NSIS para Windows. A aprovação deve ser conferida na execução associada ao commit; ainda faltam testes físicos em Windows limpo e validação com uma instalação real do TOTK Recomp.
 
 ## Visão do projeto
 
-- **Local-first:** dados e operações devem permanecer no computador do usuário.
+- **Local-first:** dados e operações permanecem no computador do usuário.
 - **Privacidade:** sem anúncios, sem telemetria invasiva e sem conta ou nuvem obrigatória.
 - **Modular:** Dashboard, File Manager, Toolbox, GameHub, Save Center e Configurações.
-- **Seguro:** nenhuma operação destrutiva automática. Alterações futuras em arquivos exigirão pré-visualização, confirmação e registro.
-- **Extensível:** conectores independentes para launchers e serviços de jogos.
+- **Seguro:** operações destrutivas exigem confirmação e usam a Lixeira; backups são cópias e restaurações preservam o estado anterior.
+- **Extensível:** conectores independentes para launchers e jogos.
 
 ## Stack
 
 - React + TypeScript + Vite
 - Tauri 2 + Rust
-- SQLite planejado para persistência local
+- Persistência local em JSON para preferências e catálogo inicial do Save Center; SQLite permanece planejado quando o volume de dados justificar.
 
 ## Estado atual
 
 | Área | Estado |
 |---|---|
-| Dashboard e identidade visual | Interface desktop inicial |
-| Navegação modular | Estrutura inicial |
-| Núcleo Rust e diagnóstico | Diagnóstico + comandos de diretório |
-| File Manager | Inicial: navegar diretórios, filtrar itens e criar pastas |
-| Toolbox | Parcial: transformador de texto e formatador JSON offline |
-| GameHub e conectores | Planejado |
-| Save Center | Planejado, aproveitando o Save Manager existente |
-| SQLite e migrações | Planejado |
-| Testes automatizados e instalador | Ainda não validados |
+| Dashboard e identidade visual | Monitoramento nativo de CPU, RAM e unidade do sistema no Windows; identidade visual e diagnóstico do core |
+| File Manager | Navegação, filtro, criação, renomeação, cópia, movimentação e Lixeira |
+| Configurações | Tema escuro/claro/sistema e preferências persistentes |
+| Toolbox | Transformador de texto, JSON, Base64, URL, SHA-256 e UUID offline |
+| GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG; favoritos e abertura da pasta de instalação |
+| Save Center | Cadastro manual de pastas, backups locais, histórico e restauração protegida |
+| Seleção de pastas | Diálogo nativo do Windows via Tauri |
+| Build/instalador | CI gera instalador NSIS x64; instalação física ainda não validada em máquina Windows limpa |
 
 ## Instalação para usuários
 
-A versão distribuída será instalada por um assistente gráfico do Windows. Usuários finais não precisarão instalar Node.js ou Rust, nem abrir CMD ou PowerShell. Consulte [Instalação e uso](docs/INSTALLATION.md) para conhecer o fluxo planejado e o estado atual da distribuição.
+A versão distribuída será instalada por um assistente gráfico do Windows. Usuários finais não precisarão instalar Node.js ou Rust, nem abrir CMD ou PowerShell. Consulte [Instalação e uso](docs/INSTALLATION.md). O artefato de CI atual é experimental e não representa uma versão estável.
 
-O workflow de instalador pode ser executado manualmente pela aba **Actions** do GitHub ou por uma tag `v*`. Os pacotes gerados ficam como artefatos de teste; tags criam uma Release em rascunho para revisão antes da publicação. Nenhum instalador será considerado estável sem testes reais no Windows.
+O pipeline de validação é executado automaticamente em Pull Requests direcionados à `main` e em pushes na `main`. Os pacotes gerados pelo CI são artefatos temporários de teste, não releases públicas. O workflow de publicação é separado e só prepara um rascunho de pré-release quando uma tag de versão é criada. Nenhuma versão será considerada estável sem testes reais em Windows limpo.
 
-## Executar no Windows
+## Desenvolvimento
 
 ### Requisitos
 
 - Windows 10/11
-- Node.js LTS
+- Node.js 22
 - Rust stable com toolchain MSVC
 - Microsoft C++ Build Tools
 - WebView2 Runtime
 
-### Desenvolvimento
+### Comandos para contribuidores
 
-```powershell
+~~~powershell
 npm install
 npm run tauri dev
-```
+~~~
 
-### Build
+Gerar o instalador:
 
-```powershell
+~~~powershell
 npm run tauri build
-```
+~~~
 
-O build e o instalador ainda precisam ser executados e validados em ambiente Windows. Não considere a versão pronta para distribuição até essa validação.
+Os comandos de terminal pertencem exclusivamente ao desenvolvimento, não à instalação ou ao uso da versão distribuída.
 
 ## Como contribuir
-
-Contribuições são bem-vindas! Antes de começar:
 
 1. Leia [CONTRIBUTING.md](CONTRIBUTING.md).
 2. Consulte as [issues abertas](../../issues).
 3. Para mudanças grandes, abra uma issue para discutir a proposta.
 4. Envie suas alterações por Pull Request.
 
-Use os modelos de issue para reportar bugs e sugerir funcionalidades. Leia também nosso [Código de Conduta](CODE_OF_CONDUCT.md) e a [Política de Segurança](SECURITY.md).
+Use os modelos de issue para reportar bugs e sugerir funcionalidades. Leia também [Código de Conduta](CODE_OF_CONDUCT.md) e [Política de Segurança](SECURITY.md).
 
-## Roadmap inicial
+## Próximos marcos
 
-1. **0.1:** fundação, navegação e identidade visual.
-2. **0.2:** dashboard e configurações.
-3. **0.3:** File Manager com operações seguras.
-4. **0.4:** Toolbox.
-5. **0.5:** GameHub e descoberta de launchers.
-6. **0.6:** Save Center integrado ao Save Manager existente.
-7. **0.7:** testes, otimização e instalador Windows.
-
-O roadmap pode mudar conforme feedback e contribuições da comunidade.
+1. Testes de restauração com falhas simuladas e validação física do Save Center.
+2. Validar o adaptador TOTK Recomp com instalação real e confirmar `TOTK_PROFILE_DIR`.
+3. Testar instalação, inicialização, atualização manual e remoção em Windows limpo.
+4. Gerar e versionar lockfiles para builds reproduzíveis.
+5. Expandir conectores do GameHub e melhorar operações em lote no File Manager.\n6. Expandir monitoramento de GPU e Toolbox com ferramentas adicionais verificáveis.
 
 ## Licença
 

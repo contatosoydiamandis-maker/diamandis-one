@@ -6,3 +6,4 @@ src-tauri/gen
 .env
 .env.*
 !.env.example
+src-tauri/icons/icon.ico

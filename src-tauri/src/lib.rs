@@ -1,6 +1,14 @@
+mod atomic_file;
+mod file_ops;
+mod gamehub;
+mod settings;
+mod save_center;
+mod totk_recomp;
+mod system_metrics;
+
 use serde::Serialize;
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::PathBuf;
 use std::io::ErrorKind;
 
 #[derive(Serialize)]
@@ -9,7 +17,14 @@ struct FileEntry { name: String, path: String, is_dir: bool, size: Option<u64> }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct DirectoryListing { path: String, parent: Option<String>, entries: Vec<FileEntry> }
+struct DirectoryListing {
+    path: String,
+    parent: Option<String>,
+    total: usize,
+    offset: usize,
+    limit: usize,
+    entries: Vec<FileEntry>,
+}
 
 #[tauri::command]
 fn core_diagnostic() -> String {
@@ -17,42 +32,121 @@ fn core_diagnostic() -> String {
 }
 
 #[tauri::command]
-fn list_directory(path: Option<String>) -> Result<DirectoryListing, String> {
+async fn list_directory(
+    path: Option<String>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+    query: Option<String>,
+    kind: Option<String>,
+    sort: Option<String>,
+) -> Result<DirectoryListing, String> {
+    let offset = offset.unwrap_or(0);
+    let limit = limit.unwrap_or(150).clamp(25, 500);
+    let query = query.unwrap_or_default();
+    let kind = kind.unwrap_or_else(|| "all".into());
+    let sort = sort.unwrap_or_else(|| "name".into());
+    tauri::async_runtime::spawn_blocking(move || {
+        list_directory_impl(path, offset, limit, query, kind, sort)
+    }).await.map_err(|_| "Não foi possível carregar esta pasta em segundo plano.".to_string())?
+}
+
+fn matches_directory_filters(name: &str, is_dir: bool, query: &str, kind: &str) -> bool {
+    let matches_query = query.is_empty() || name.to_lowercase().contains(query);
+    let matches_kind = match kind {
+        "folders" => is_dir,
+        "files" => !is_dir,
+        _ => true,
+    };
+    matches_query && matches_kind
+}
+
+fn list_directory_impl(
+    path: Option<String>,
+    offset: usize,
+    limit: usize,
+    query: String,
+    kind: String,
+    sort: String,
+) -> Result<DirectoryListing, String> {
+    if query.len() > 512 { return Err("O filtro de busca excede o limite permitido.".into()); }
+    if !matches!(kind.as_str(), "all" | "folders" | "files") {
+        return Err("O filtro de tipo informado é inválido.".into());
+    }
+    if !matches!(sort.as_str(), "name" | "size" | "type") {
+        return Err("A ordenação informada é inválida.".into());
+    }
+    let query = query.trim().to_lowercase();
     let requested = path.filter(|v| !v.trim().is_empty()).map(PathBuf::from).unwrap_or_else(home_dir);
     let canonical = requested.canonicalize().map_err(|e| friendly_io_error("acessar esta pasta", &e))?;
     if !canonical.is_dir() { return Err("O caminho informado não é uma pasta.".into()); }
     let iterator = fs::read_dir(&canonical).map_err(|e| friendly_io_error("listar esta pasta", &e))?;
-    let mut entries = Vec::new();
+    let mut candidates = Vec::new();
     for item in iterator {
         let item = item.map_err(|e| friendly_io_error("ler um item desta pasta", &e))?;
         let item_path = item.path();
-        let metadata = item.metadata().ok();
-        let is_dir = metadata.as_ref().map(|m| m.is_dir()).unwrap_or(false);
-        entries.push(FileEntry {
-            name: item.file_name().to_string_lossy().to_string(),
-            path: item_path.to_string_lossy().to_string(),
-            is_dir,
-            size: metadata.filter(|m| m.is_file()).map(|m| m.len()),
-        });
+        let file_type = item.file_type().map_err(|e| friendly_io_error("identificar um item desta pasta", &e))?;
+        let name = item.file_name().to_string_lossy().to_string();
+        let is_dir = file_type.is_dir();
+        let is_symlink = file_type.is_symlink();
+        if !matches_directory_filters(&name, is_dir, &query, &kind) { continue; }
+        let size = if !is_dir && !is_symlink {
+            fs::metadata(&item_path).ok().filter(|metadata| metadata.is_file()).map(|metadata| metadata.len())
+        } else { None };
+        candidates.push((name, item_path, is_dir, size));
     }
-    entries.sort_by(|a,b| b.is_dir.cmp(&a.is_dir).then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    candidates.sort_by(|a, b| match sort.as_str() {
+        "size" => b.3.unwrap_or(0).cmp(&a.3.unwrap_or(0)).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())),
+        "type" => b.2.cmp(&a.2).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())),
+        _ => b.2.cmp(&a.2).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())),
+    });
+    let total = candidates.len();
+    let safe_offset = offset.min(total);
+    let entries = candidates.into_iter().skip(safe_offset).take(limit).map(|(name, item_path, is_dir, size)| {
+        FileEntry { name, path: item_path.to_string_lossy().to_string(), is_dir, size }
+    }).collect();
     Ok(DirectoryListing {
         path: canonical.to_string_lossy().to_string(),
         parent: canonical.parent().map(|p| p.to_string_lossy().to_string()),
+        total,
+        offset: safe_offset,
+        limit,
         entries,
     })
 }
 
+#[cfg(test)]
+mod directory_filter_tests {
+    use super::matches_directory_filters;
+
+    #[test]
+    fn searches_names_case_insensitively_across_file_types() {
+        assert!(matches_directory_filters("SaveGame.DAT", false, "save", "all"));
+        assert!(!matches_directory_filters("Other.dat", false, "save", "all"));
+    }
+
+    #[test]
+    fn applies_folder_and_file_filters() {
+        assert!(matches_directory_filters("Saves", true, "", "folders"));
+        assert!(!matches_directory_filters("save.dat", false, "", "folders"));
+        assert!(matches_directory_filters("save.dat", false, "", "files"));
+        assert!(!matches_directory_filters("Saves", true, "", "files"));
+    }
+}
+
 #[tauri::command]
-fn create_directory(parent: String, name: String) -> Result<(), String> {
-    let name = validate_folder_name(&name)?;
+async fn create_directory(parent: String, name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || create_directory_impl(parent, name)).await
+        .map_err(|_| "Não foi possível criar a pasta em segundo plano.".to_string())?
+}
+
+fn create_directory_impl(parent: String, name: String) -> Result<(), String> {
+    let name = file_ops::validate_name(&name)?;
     let parent = PathBuf::from(parent).canonicalize().map_err(|e| friendly_io_error("acessar a pasta de destino", &e))?;
     if !parent.is_dir() { return Err("O destino informado não é uma pasta.".into()); }
     let destination = parent.join(name);
     if destination.exists() { return Err("Já existe um item com esse nome.".into()); }
     fs::create_dir(destination).map_err(|e| friendly_io_error("criar a pasta", &e))
 }
-
 
 fn friendly_io_error(action: &str, error: &std::io::Error) -> String {
     let reason = match error.kind() {
@@ -65,56 +159,6 @@ fn friendly_io_error(action: &str, error: &std::io::Error) -> String {
     format!("Não foi possível {action}: {reason}.")
 }
 
-fn validate_folder_name(name: &str) -> Result<&str, String> {
-    let clean = name.trim();
-    let candidate = Path::new(clean);
-    let reserved_stem = clean.split('.').next().unwrap_or("").trim().to_ascii_uppercase();
-    let reserved_device = matches!(reserved_stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
-        || (["COM", "LPT"].iter().any(|prefix| {
-            reserved_stem.strip_prefix(*prefix)
-                .and_then(|suffix| suffix.parse::<u8>().ok())
-                .is_some_and(|number| (1..=9).contains(&number))
-        }));
-    let invalid_windows_character = clean.chars().any(|ch| {
-        ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
-    });
-    if clean.is_empty()
-        || clean.ends_with(' ') || clean.ends_with('.')
-        || invalid_windows_character
-        || reserved_device
-        || !matches!(candidate.components().next(), Some(Component::Normal(_)))
-        || candidate.components().count() != 1
-    {
-        return Err("Use um nome de pasta válido para o Windows. Evite caminhos, caracteres especiais e nomes reservados.".into());
-    }
-    Ok(clean)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::validate_folder_name;
-
-    #[test]
-    fn accepts_simple_folder_names() {
-        assert_eq!(validate_folder_name("Minhas imagens").unwrap(), "Minhas imagens");
-        assert_eq!(validate_folder_name("  Projetos  ").unwrap(), "Projetos");
-    }
-
-    #[test]
-    fn rejects_empty_and_traversal_names() {
-        assert!(validate_folder_name("").is_err());
-        assert!(validate_folder_name("   ").is_err());
-        assert!(validate_folder_name("..").is_err());
-        assert!(validate_folder_name("../fora").is_err());
-        assert!(validate_folder_name("pasta/subpasta").is_err());
-        assert!(validate_folder_name("pasta\\subpasta").is_err());
-        assert!(validate_folder_name("CON").is_err());
-        assert!(validate_folder_name("NUL.txt").is_err());
-        assert!(validate_folder_name("nome.").is_err());
-        assert!(validate_folder_name("nome?invalido").is_err());
-    }
-}
-
 fn home_dir() -> PathBuf {
     std::env::var_os("USERPROFILE").map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
@@ -124,7 +168,8 @@ fn home_dir() -> PathBuf {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![core_diagnostic, list_directory, create_directory])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![core_diagnostic, system_metrics::get_system_metrics, list_directory, create_directory, file_ops::rename_item, file_ops::copy_file, file_ops::move_item, file_ops::delete_item, settings::load_settings, settings::save_settings, gamehub::scan_games, gamehub::open_game_folder, save_center::list_save_games, save_center::add_save_game, save_center::remove_save_game, save_center::create_save_backup, save_center::list_save_backups, save_center::verify_save_backup, save_center::restore_save_backup, totk_recomp::configure_totk_install, totk_recomp::get_totk_install, totk_recomp::list_totk_campaigns, totk_recomp::import_totk_profile, totk_recomp::create_empty_totk_campaign, totk_recomp::launch_totk_campaign, totk_recomp::is_totk_running])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar DIAMANDIS ONE");
 }
