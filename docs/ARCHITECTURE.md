@@ -11,7 +11,8 @@
 - UI: React + TypeScript.
 - Desktop bridge: Tauri IPC e plugins de capacidade mínima.
 - Core: Rust.
-- Preferences: arquivo JSON em app_config_dir.
+- Preferences: arquivo JSON em app_config_dir, com escrita temporária, sincronização em disco e substituição atômica compatível com Windows.
+- Theme: preferência escuro/claro/sistema; o modo sistema acompanha mudanças de aparência do Windows durante a execução.
 - File Manager: leitura de diretórios e operações explícitas; exclusão via Lixeira do sistema.
 - GameHub: scanners somente leitura por launcher.
 - Save Center: catálogo local, cópias de segurança e restauração transacional por diretório.
@@ -37,7 +38,8 @@
 - A restauração prepara uma pasta temporária, verifica contagem, tamanho e hashes, preserva o save atual em .diamandis-pre-restore-* e só então troca os diretórios.
 - Backups antigos sem hashes continuam legíveis e usam a verificação estrutural anterior.
 - O diálogo nativo de seleção de pasta evita exigir que a pessoa digite caminhos manualmente.
-- As operações de backup, restauração e gerenciamento de campanhas TOTK usam um lock de processo para impedir concorrência entre mutações.
+- As operações de cadastro, remoção, backup, restauração e gerenciamento de campanhas TOTK usam um lock de processo para impedir concorrência entre mutações.
+- Catálogo e configurações são gravados por substituição atômica; tamanho e quantidade de arquivos são medidos novamente no payload final antes da verificação.
 - A inicialização de campanha exige backup preventivo no backend antes de criar o processo do jogo.
 
 ## Adaptador Zelda: TOTK Recomp
