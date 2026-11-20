@@ -8,8 +8,14 @@ let cachedGames: Game[] | null = null;
 let cachedAt = 0;
 
 const readFavorites = (): string[] => {
-  try { return JSON.parse(localStorage.getItem("diamandis.gamehub.favorites") || "[]") as string[]; }
-  catch { return []; }
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem("diamandis.gamehub.favorites") || "[]");
+    return Array.isArray(stored)
+      ? stored.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
 };
 
 export default function GameHub() {
