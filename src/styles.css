@@ -268,3 +268,31 @@ button{ -webkit-tap-highlight-color:transparent }
 .save-remove-button{flex:0 0 29px;color:#a88e99}
 .save-remove-button:hover{border-color:#a45e70;color:#f0a9b8;background:#2c1b25}
 :root[data-theme="light"] .save-remove-button{background:#fff;color:#866b79}
+
+
+/* Dashboard: native Windows system telemetry */
+.system-dashboard{margin:20px 0 27px;padding:17px;border:1px solid #342c40;border-radius:12px;background:linear-gradient(145deg,#171620,#111018);box-shadow:0 10px 28px #0002}
+.system-dashboard-heading{margin:0 0 14px}
+.system-dashboard-heading h3{font-size:15px;margin:0 0 5px}
+.system-dashboard-heading p{font-size:10px;color:#92899c;margin:0}
+.system-metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.system-metric-card{display:flex;flex-direction:column;min-width:0;min-height:125px;padding:12px;border:1px solid #393044;border-radius:9px;background:linear-gradient(145deg,#1c1924,#121119)}
+.system-metric-top{display:flex;align-items:center;gap:8px;color:#a99ab8;font:8px ui-monospace,monospace;letter-spacing:.8px}
+.system-metric-icon{display:grid;place-items:center;width:29px;height:29px;border:1px solid #59466f;border-radius:8px;background:#2b203a;color:#d5c0ee}
+.system-metric-value{display:block;margin:12px 0 3px;color:#eee5f5;font:700 23px ui-monospace,monospace;letter-spacing:-.8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.system-metric-card small{min-height:25px;color:#8f869b;font-size:9px;line-height:1.5}
+.system-metric-track{height:4px;margin-top:auto;overflow:hidden;border-radius:5px;background:#342c40}
+.system-metric-track i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#8261b1,#c2a0e8);transition:width .35s ease}
+.system-metric-card.unavailable .system-metric-value{font-size:16px;color:#b4a8bd}
+.system-metric-error{margin:0 0 12px;padding:9px 11px;border:1px solid #6a4b48;border-radius:7px;background:#261919;color:#e3aaa0;font-size:10px;line-height:1.5}
+.system-dashboard-foot{display:flex;justify-content:space-between;gap:12px;margin-top:13px;padding-top:10px;border-top:1px solid #ffffff0c;color:#81788e;font:8px ui-monospace,monospace;letter-spacing:.4px}
+.system-dashboard-foot span:first-child{display:flex;align-items:center;gap:6px}
+.system-dashboard-foot i{width:6px;height:6px;border-radius:50%;background:#83c99a;box-shadow:0 0 9px #83c99a66}
+:root[data-theme="light"] .system-dashboard{background:linear-gradient(145deg,#fff,#f6f2fa);border-color:#ded4e8}
+:root[data-theme="light"] .system-metric-card{background:#fff;border-color:#e3dbea}
+:root[data-theme="light"] .system-metric-value{color:#30263d}
+:root[data-theme="light"] .system-metric-top{color:#756782}
+:root[data-theme="light"] .system-metric-track{background:#e8e0ef}
+:root[data-theme="light"] .system-dashboard-foot{border-color:#e9e2ef}
+@media(max-width:1050px){.system-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.system-dashboard{padding:12px}.system-metric-grid{grid-template-columns:1fr 1fr}.system-metric-card{padding:10px}.system-metric-value{font-size:19px}.system-dashboard-foot{flex-direction:column}}
