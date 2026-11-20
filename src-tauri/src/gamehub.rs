@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::{collections::HashSet, env, fs, path::PathBuf};
+use std::{collections::HashSet, env, fs, path::PathBuf, process::Command};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -123,4 +123,34 @@ mod tests {
     fn ignores_other_vdf_keys() {
         assert_eq!(quoted_value(r#""appid" "620""#, "path"), None);
     }
+}
+
+
+fn resolve_game_folder(path: &str) -> Result<PathBuf, String> {
+    let requested = PathBuf::from(path);
+    let canonical = requested.canonicalize()
+        .map_err(|_| "A pasta de instalação não existe ou não pode ser acessada.".to_string())?;
+    if !canonical.is_dir() {
+        return Err("O caminho do jogo não aponta para uma pasta.".into());
+    }
+    Ok(canonical)
+}
+
+#[tauri::command]
+pub async fn open_game_folder(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let folder = resolve_game_folder(&path)?;
+        #[cfg(target_os = "windows")]
+        let mut command = Command::new("explorer.exe");
+        #[cfg(target_os = "macos")]
+        let mut command = Command::new("open");
+        #[cfg(all(unix, not(target_os = "macos")))]
+        let mut command = Command::new("xdg-open");
+        #[cfg(not(any(target_os = "windows", target_os = "macos", unix)))]
+        return Err("Abrir pastas não é compatível com este sistema.".into());
+
+        command.arg(folder).spawn()
+            .map_err(|_| "Não foi possível abrir a pasta do jogo no gerenciador de arquivos.".to_string())?;
+        Ok(())
+    }).await.map_err(|_| "Não foi possível abrir a pasta em segundo plano.".to_string())?
 }
