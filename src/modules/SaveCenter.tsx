@@ -41,16 +41,21 @@ export default function SaveCenter() {
   const refresh = useCallback(async (gameId?: string) => {
     setBusy(true); setError("");
     try {
-      const [nextGames, nextBackups] = await Promise.all([
-        invoke<SaveGame[]>("list_save_games"),
-        invoke<SaveBackup[]>("list_save_backups", { gameId: gameId || null })
-      ]);
+      const nextGames = await invoke<SaveGame[]>("list_save_games");
+      const activeGameId = gameId || (
+        nextGames.some(game => game.id === selectedGame)
+          ? selectedGame
+          : nextGames[0]?.id || ""
+      );
+      const nextBackups = activeGameId
+        ? await invoke<SaveBackup[]>("list_save_backups", { gameId: activeGameId })
+        : [];
       setGames(nextGames);
       setBackups(nextBackups);
-      setSelectedGame(current => gameId || (nextGames.some(game => game.id === current) ? current : nextGames[0]?.id || ""));
+      setSelectedGame(activeGameId);
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); }
-  }, []);
+  }, [selectedGame]);
 
   const refreshTotk = useCallback(async () => {
     try { const [campaigns, running, install] = await Promise.all([invoke<TotkCampaign[]>("list_totk_campaigns"), invoke<boolean>("is_totk_running"), invoke<string>("get_totk_install")]); setTotkCampaigns(campaigns); setTotkRunning(running); setTotkInstall(install); }
