@@ -137,6 +137,28 @@ fn copy_tree(source: &Path, destination: &Path, stats: &mut (u64, u64)) -> io::R
     Ok(())
 }
 
+fn tree_stats(root: &Path) -> io::Result<(u64, u64)> {
+    fn visit(path: &Path, stats: &mut (u64, u64)) -> io::Result<()> {
+        let metadata = fs::symlink_metadata(path)?;
+        if metadata.file_type().is_symlink() {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "link simbólico não permitido"));
+        }
+        if metadata.is_dir() {
+            for entry in fs::read_dir(path)? {
+                visit(&entry?.path(), stats)?;
+            }
+        } else if metadata.is_file() {
+            stats.0 = stats.0.saturating_add(metadata.len());
+            stats.1 = stats.1.saturating_add(1);
+        }
+        Ok(())
+    }
+
+    let mut stats = (0u64, 0u64);
+    visit(root, &mut stats)?;
+    Ok(stats)
+}
+
 fn collect_hashes(root: &Path) -> io::Result<BTreeMap<String, String>> {
     fn visit(root: &Path, current: &Path, hashes: &mut BTreeMap<String, String>) -> io::Result<()> {
         for entry in fs::read_dir(current)? {
@@ -189,6 +211,13 @@ fn create_backup_for_game(app: &AppHandle, game: &SaveGame) -> Result<SaveBackup
         let _ = fs::remove_dir_all(&destination);
         return Err(format!("Backup cancelado: {}. Nenhum arquivo original foi alterado.", error));
     }
+    stats = match tree_stats(&payload) {
+        Ok(measured) => measured,
+        Err(error) => {
+            let _ = fs::remove_dir_all(&destination);
+            return Err(format!("Não foi possível medir o backup finalizado: {error}"));
+        }
+    };
     let file_hashes = match collect_hashes(&payload) {
         Ok(hashes) => hashes,
         Err(error) => {
@@ -276,6 +305,10 @@ pub async fn restore_save_backup(app: AppHandle, backup_id: String, game_id: Str
         let safety = parent.join(format!(".diamandis-pre-restore-{}", unique_id()));
         let mut stats = (0u64, 0u64);
         copy_tree(&payload, &stage, &mut stats).map_err(|e| { let _ = fs::remove_dir_all(&stage); format!("Não foi possível preparar a restauração: {e}") })?;
+        stats = tree_stats(&stage).map_err(|e| {
+            let _ = fs::remove_dir_all(&stage);
+            format!("Não foi possível medir os arquivos restaurados: {e}")
+        })?;
         if stats.0 != backup.size_bytes || stats.1 != backup.file_count {
             let _ = fs::remove_dir_all(&stage);
             return Err("A verificação estrutural do backup falhou. O save atual permaneceu intacto.".into());
