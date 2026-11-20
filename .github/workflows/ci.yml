@@ -16,7 +16,8 @@ concurrency:
 jobs:
   frontend:
     name: Frontend typecheck and production build
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,44 +30,18 @@ jobs:
       - name: Build frontend
         run: npm run build
       - name: Upload generated npm lockfile
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: npm-lockfile
           path: package-lock.json
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
 
-  rust:
-    name: Native core tests
+  windows-validation:
+    name: Windows tests and NSIS installer
     runs-on: windows-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Node.js for generated desktop assets
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Prepare desktop icon
-        run: node scripts/prepare-assets.mjs
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-      - name: Run native core tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
-      - name: Upload generated Cargo lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: cargo-lockfile
-          path: src-tauri/Cargo.lock
-          if-no-files-found: error
-          retention-days: 7
-
-  windows-installer:
-    name: Windows desktop build and NSIS installer
-    runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,6 +59,18 @@ jobs:
           workspaces: src-tauri -> target
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
+      - name: Prepare desktop assets
+        run: npm run prepare:assets
+      - name: Run native core tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Upload generated Cargo lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lockfile
+          path: src-tauri/Cargo.lock
+          if-no-files-found: warn
+          retention-days: 7
       - name: Build desktop app and NSIS installer
         run: npm run tauri build
       - name: Upload Windows installer
