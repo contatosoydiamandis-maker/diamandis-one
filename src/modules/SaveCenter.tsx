@@ -26,6 +26,7 @@ export default function SaveCenter() {
   const [backups, setBackups] = useState<SaveBackup[]>([]);
   const [selectedGame, setSelectedGame] = useState("");
   const selectedGameRef = useRef("");
+  const refreshSequenceRef = useRef(0);
   const [name, setName] = useState("");
   const [savePath, setSavePath] = useState("");
   const [adding, setAdding] = useState(false);
@@ -40,6 +41,7 @@ export default function SaveCenter() {
   const [totkBusy, setTotkBusy] = useState(false);
 
   const refresh = useCallback(async (gameId?: string) => {
+    const sequence = ++refreshSequenceRef.current;
     setBusy(true); setError("");
     try {
       const nextGames = await invoke<SaveGame[]>("list_save_games");
@@ -51,12 +53,16 @@ export default function SaveCenter() {
       const nextBackups = activeGameId
         ? await invoke<SaveBackup[]>("list_save_backups", { gameId: activeGameId })
         : [];
+      if (sequence !== refreshSequenceRef.current) return;
       setGames(nextGames);
       setBackups(nextBackups);
       selectedGameRef.current = activeGameId;
       setSelectedGame(activeGameId);
-    } catch (e) { setError(String(e)); }
-    finally { setBusy(false); }
+    } catch (e) {
+      if (sequence === refreshSequenceRef.current) setError(String(e));
+    } finally {
+      if (sequence === refreshSequenceRef.current) setBusy(false);
+    }
   }, []);
 
   const refreshTotk = useCallback(async () => {
@@ -122,12 +128,13 @@ export default function SaveCenter() {
 
   const restore = async (backup: SaveBackup) => {
     if (!selected) return;
-    const accepted = window.confirm(`Restaurar o backup de ${formatDate(backup.createdAt)}? O save atual será preservado em uma pasta de segurança antes da troca.`);
+    const accepted = window.confirm(`Antes de continuar, feche completamente o jogo para evitar que ele sobrescreva os arquivos restaurados.\n\nRestaurar o backup de ${formatDate(backup.createdAt)}? O save atual será preservado em uma pasta de segurança antes da troca.`);
     if (!accepted) return;
     setWorkingId(backup.id); setError(""); setNotice("");
     try {
       const message = await invoke<string>("restore_save_backup", { backupId: backup.id, gameId: selected.id });
       setNotice(message);
+      await refresh(selected.id);
     } catch (e) { setError(String(e)); }
     finally { setWorkingId(""); }
   };
@@ -181,7 +188,7 @@ export default function SaveCenter() {
 
         {selected ? <>
           <div className="save-selected-heading"><div><span className="tool-kicker">JOGO SELECIONADO</span><h3>{selected.name}</h3><code title={selected.savePath}>{selected.savePath}</code></div><button className="primary-button compact" onClick={() => void createBackup()} disabled={!!workingId}><Archive size={14}/>{workingId === "create" ? "Criando..." : "Criar backup"}</button></div>
-          <div className="save-safety-strip"><ShieldCheck size={15}/><span>Backup somente por cópia. Restaurações preservam o estado atual em uma pasta de segurança.</span></div>
+          <div className="save-safety-strip"><ShieldCheck size={15}/><span>Feche o jogo antes de criar ou restaurar backups. A cópia não altera o original, e a restauração preserva o estado atual em uma pasta de segurança.</span></div>
           <div className="save-history-heading"><div><h4>Histórico de backups</h4><p>{backups.length} versão(ões) armazenada(s) localmente</p></div><Clock3 size={17}/></div>
           {busy ? <div className="save-empty"><LoaderCircle className="spin" size={22}/><span>Carregando histórico...</span></div> : backups.length ? <div className="save-backup-list">{backups.map(backup => <article className="save-backup-row" key={backup.id}>
             <div className="save-backup-icon"><Archive size={16}/></div><div className="save-backup-info"><strong>{formatDate(backup.createdAt)}</strong><span>{backup.fileCount} arquivo(s) • {formatSize(backup.sizeBytes)} • {Object.keys(backup.fileHashes || {}).length ? "SHA-256 verificado" : "Verificação estrutural"}</span><small>{backup.backupPath}</small></div>
