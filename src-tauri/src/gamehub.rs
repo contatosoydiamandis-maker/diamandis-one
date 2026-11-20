@@ -111,7 +111,8 @@ fn scan_games_impl() -> Result<Vec<GameEntry>, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::quoted_value;
+    use super::{quoted_value, resolve_game_folder};
+    use std::{fs, time::{SystemTime, UNIX_EPOCH}};
 
     #[test]
     fn reads_quoted_vdf_values() {
@@ -122,6 +123,27 @@ mod tests {
     #[test]
     fn ignores_other_vdf_keys() {
         assert_eq!(quoted_value(r#""appid" "620""#, "path"), None);
+    }
+
+    #[test]
+    fn accepts_an_existing_installation_folder() {
+        let folder = std::env::temp_dir().join(format!(
+            "diamandis-gamehub-test-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        fs::create_dir_all(&folder).unwrap();
+        let resolved = resolve_game_folder(folder.to_str().unwrap()).unwrap();
+        assert_eq!(resolved, folder.canonicalize().unwrap());
+        fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn rejects_a_missing_installation_folder() {
+        let missing = std::env::temp_dir().join(format!(
+            "diamandis-gamehub-missing-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        assert!(resolve_game_folder(missing.to_str().unwrap()).is_err());
     }
 }
 
