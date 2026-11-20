@@ -9,6 +9,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import type { ModuleId } from "./types";
+import { setThemePreference } from "./theme";
 import GameHub from "./modules/GameHub";
 import Settings from "./modules/Settings";
 import SaveCenter from "./modules/SaveCenter";
@@ -40,8 +41,8 @@ function App() {
 
   useEffect(() => {
     void invoke<{ theme: "dark" | "light" | "system" }>("load_settings")
-      .then(settings => { document.documentElement.dataset.theme = settings.theme; })
-      .catch(() => { document.documentElement.dataset.theme = "dark"; });
+      .then(settings => setThemePreference(settings.theme))
+      .catch(() => setThemePreference("dark"));
   }, []);
 
   const runDiagnostic = async () => {
