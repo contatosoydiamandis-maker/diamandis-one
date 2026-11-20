@@ -27,6 +27,10 @@ struct TotkConfig {
 fn stamp() -> String {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis().to_string()
 }
+
+fn unique_id() -> String {
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos().to_string()
+}
 fn root(app: &AppHandle) -> Result<PathBuf, String> {
     let path = app.path().app_local_data_dir().map_err(|_| "Não foi possível localizar os dados locais.".to_string())?.join("totk-recomp");
     fs::create_dir_all(&path).map_err(|_| "Não foi possível preparar os dados do adaptador TOTK.".to_string())?;
@@ -156,7 +160,7 @@ pub async fn create_empty_totk_campaign(app: AppHandle, name: String) -> Result<
         let config = read_config(&app)?;
         validate_install(Path::new(&config.install_path))?;
         if game_running()? { return Err("Feche o TOTK Recomp antes de criar ou alterar campanhas.".into()); }
-        let id = stamp();
+        let id = unique_id();
         let destination = root(&app)?.join("campaigns").join(&id);
         fs::create_dir_all(&destination).map_err(|_| "Não foi possível criar a campanha vazia.".to_string())?;
         let campaign = TotkCampaign { id, name, path: destination.to_string_lossy().into_owned(), created_at: stamp() };
