@@ -2,7 +2,7 @@
 
 **Um hub desktop local-first para Windows:** organização de arquivos, ferramentas de produtividade e gerenciamento da biblioteca gamer em um só lugar.
 
-> **Status: pré-alpha 0.2.0.** A base desktop inclui navegação de arquivos, operações controladas, preferências persistentes, descoberta inicial de jogos Steam/Epic/GOG e Save Center com backups SHA-256 e restauração protegida. O adaptador TOTK Recomp já oferece campanhas isoladas, importação por cópia e backup obrigatório antes de iniciar. A CI validou frontend, testes Rust e geração do instalador NSIS. Ainda faltam testes físicos em Windows limpo e validação com uma instalação real do TOTK Recomp.
+> **Status: pré-alpha 0.2.0.** A base desktop inclui navegação de arquivos, operações controladas, preferências persistentes, descoberta inicial de jogos Steam/Epic/GOG e Save Center com backups SHA-256 e restauração protegida. O adaptador TOTK Recomp já oferece campanhas isoladas, importação por cópia e backup obrigatório antes de iniciar. A CI automatiza o build do frontend, os testes Rust e a geração do instalador NSIS para Windows. A aprovação deve ser conferida na execução associada ao commit; ainda faltam testes físicos em Windows limpo e validação com uma instalação real do TOTK Recomp.
 
 ## Visão do projeto
 
@@ -35,7 +35,7 @@
 
 A versão distribuída será instalada por um assistente gráfico do Windows. Usuários finais não precisarão instalar Node.js ou Rust, nem abrir CMD ou PowerShell. Consulte [Instalação e uso](docs/INSTALLATION.md). O artefato de CI atual é experimental e não representa uma versão estável.
 
-O workflow de instalador é executado automaticamente em Pull Requests direcionados à `main` e em pushes na `main`. Os pacotes gerados são artefatos temporários de teste, não releases públicas. Nenhuma versão será considerada estável sem testes reais em Windows limpo.
+O pipeline de validação é executado automaticamente em Pull Requests direcionados à `main` e em pushes na `main`. Os pacotes gerados pelo CI são artefatos temporários de teste, não releases públicas. O workflow de publicação é separado e só prepara um rascunho de pré-release quando uma tag de versão é criada. Nenhuma versão será considerada estável sem testes reais em Windows limpo.
 
 ## Desenvolvimento
 
