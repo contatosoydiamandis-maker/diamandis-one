@@ -287,6 +287,28 @@ pub async fn list_save_backups(app: AppHandle, game_id: Option<String>) -> Resul
         .map_err(|_| "Falha ao carregar o histórico de backups.".to_string())?
 }
 
+fn verify_payload(
+    payload: &Path,
+    expected_size: u64,
+    expected_count: u64,
+    expected_hashes: &BTreeMap<String, String>,
+) -> Result<(u64, u64, bool), String> {
+    let stats = tree_stats(payload)
+        .map_err(|e| format!("Não foi possível ler o conteúdo do backup: {e}"))?;
+    if stats.0 != expected_size || stats.1 != expected_count {
+        return Err("A verificação estrutural falhou: tamanho ou quantidade de arquivos divergente.".into());
+    }
+    let has_hash_manifest = !expected_hashes.is_empty() || expected_count == 0;
+    if has_hash_manifest {
+        let actual = collect_hashes(payload)
+            .map_err(|e| format!("Não foi possível calcular os hashes do backup: {e}"))?;
+        if actual != *expected_hashes {
+            return Err("A verificação SHA-256 falhou. Não restaure este backup.".into());
+        }
+    }
+    Ok((stats.0, stats.1, has_hash_manifest))
+}
+
 fn verify_backup_impl(app: &AppHandle, backup_id: &str, game_id: &str) -> Result<String, String> {
     if !safe_id(game_id) || !safe_id(backup_id) {
         return Err("Identificador de jogo ou backup inválido.".into());
@@ -300,27 +322,22 @@ fn verify_backup_impl(app: &AppHandle, backup_id: &str, game_id: &str) -> Result
     if !payload.is_dir() {
         return Err("O conteúdo deste backup está incompleto.".into());
     }
-    let stats = tree_stats(&payload)
-        .map_err(|e| format!("Não foi possível ler o conteúdo do backup: {e}"))?;
-    if stats.0 != backup.size_bytes || stats.1 != backup.file_count {
-        return Err("A verificação estrutural falhou: tamanho ou quantidade de arquivos divergente.".into());
-    }
-    if !backup.file_hashes.is_empty() || backup.file_count == 0 {
-        let hashes = collect_hashes(&payload)
-            .map_err(|e| format!("Não foi possível calcular os hashes do backup: {e}"))?;
-        if hashes != backup.file_hashes {
-            return Err("A verificação SHA-256 falhou. Não restaure este backup.".into());
-        }
-        Ok(format!("Integridade confirmada: {} arquivo(s), {}. Todos os hashes SHA-256 conferem.", stats.1, stats.0))
+    let (size, count, has_hash_manifest) = verify_payload(
+        &payload, backup.size_bytes, backup.file_count, &backup.file_hashes
+    )?;
+    if has_hash_manifest {
+        Ok(format!("Integridade confirmada: {} arquivo(s), {}. Todos os hashes SHA-256 conferem.", count, size))
     } else {
-        Ok(format!("Estrutura confirmada: {} arquivo(s), {}. Este backup antigo não possui hashes SHA-256.", stats.1, stats.0))
+        Ok(format!("Estrutura confirmada: {} arquivo(s), {}. Este backup antigo não possui hashes SHA-256.", count, size))
     }
 }
 
 #[tauri::command]
 pub async fn verify_save_backup(app: AppHandle, backup_id: String, game_id: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || verify_backup_impl(&app, &backup_id, &game_id))
-        .await.map_err(|_| "Falha ao verificar o backup em segundo plano.".to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = crate::totk_recomp::operation_lock()?;
+        verify_backup_impl(&app, &backup_id, &game_id)
+    }).await.map_err(|_| "Falha ao verificar o backup em segundo plano.".to_string())?
 }
 
 #[tauri::command]
@@ -375,8 +392,8 @@ pub async fn restore_save_backup(app: AppHandle, backup_id: String, game_id: Str
 
 #[cfg(test)]
 mod tests {
-    use super::{collect_hashes, copy_tree, tree_stats};
-    use std::{fs, time::{SystemTime, UNIX_EPOCH}};
+    use super::{collect_hashes, copy_tree, tree_stats, verify_payload};
+    use std::{collections::BTreeMap, fs, time::{SystemTime, UNIX_EPOCH}};
 
     fn temp_root() -> std::path::PathBuf {
         std::env::temp_dir().join(format!("diamandis-save-test-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()))
@@ -419,6 +436,29 @@ mod tests {
         fs::write(payload.join("slot.dat"), b"modified-save").unwrap();
         let changed = collect_hashes(&payload).unwrap();
         assert_ne!(original, changed);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn verification_accepts_intact_sha256_manifest_and_rejects_tampering() {
+        let root = temp_root();
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("slot.dat"), b"original-save").unwrap();
+        let hashes = collect_hashes(&root).unwrap();
+        let stats = tree_stats(&root).unwrap();
+        assert_eq!(verify_payload(&root, stats.0, stats.1, &hashes).unwrap(), (stats.0, stats.1, true));
+        fs::write(root.join("slot.dat"), b"tampered-save").unwrap();
+        assert!(verify_payload(&root, stats.0, stats.1, &hashes).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn legacy_backup_without_hashes_is_structurally_verified() {
+        let root = temp_root();
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("legacy.dat"), b"old-save").unwrap();
+        assert_eq!(verify_payload(&root, 8, 1, &BTreeMap::new()).unwrap(), (8, 1, false));
+        assert!(verify_payload(&root, 9, 1, &BTreeMap::new()).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 }
