@@ -287,6 +287,42 @@ pub async fn list_save_backups(app: AppHandle, game_id: Option<String>) -> Resul
         .map_err(|_| "Falha ao carregar o histórico de backups.".to_string())?
 }
 
+fn verify_backup_impl(app: &AppHandle, backup_id: &str, game_id: &str) -> Result<String, String> {
+    if !safe_id(game_id) || !safe_id(backup_id) {
+        return Err("Identificador de jogo ou backup inválido.".into());
+    }
+    let game = find_game(&read_games(app)?, game_id)?;
+    let backup = list_backups_impl(app, Some(game_id.to_string()))?
+        .into_iter()
+        .find(|item| item.id == backup_id)
+        .ok_or_else(|| "Backup não encontrado para este jogo.".to_string())?;
+    let payload = backup_root(app)?.join(game.id).join(backup.id).join("payload");
+    if !payload.is_dir() {
+        return Err("O conteúdo deste backup está incompleto.".into());
+    }
+    let stats = tree_stats(&payload)
+        .map_err(|e| format!("Não foi possível ler o conteúdo do backup: {e}"))?;
+    if stats.0 != backup.size_bytes || stats.1 != backup.file_count {
+        return Err("A verificação estrutural falhou: tamanho ou quantidade de arquivos divergente.".into());
+    }
+    if !backup.file_hashes.is_empty() || backup.file_count == 0 {
+        let hashes = collect_hashes(&payload)
+            .map_err(|e| format!("Não foi possível calcular os hashes do backup: {e}"))?;
+        if hashes != backup.file_hashes {
+            return Err("A verificação SHA-256 falhou. Não restaure este backup.".into());
+        }
+        Ok(format!("Integridade confirmada: {} arquivo(s), {}. Todos os hashes SHA-256 conferem.", stats.1, stats.0))
+    } else {
+        Ok(format!("Estrutura confirmada: {} arquivo(s), {}. Este backup antigo não possui hashes SHA-256.", stats.1, stats.0))
+    }
+}
+
+#[tauri::command]
+pub async fn verify_save_backup(app: AppHandle, backup_id: String, game_id: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || verify_backup_impl(&app, &backup_id, &game_id))
+        .await.map_err(|_| "Falha ao verificar o backup em segundo plano.".to_string())?
+}
+
 #[tauri::command]
 pub async fn restore_save_backup(app: AppHandle, backup_id: String, game_id: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
