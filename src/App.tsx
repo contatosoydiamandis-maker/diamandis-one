@@ -279,6 +279,7 @@ function Toolbox() {
   const [base64Error, setBase64Error] = useState("");
   const [urlInput, setUrlInput] = useState("");
   const [urlOutput, setUrlOutput] = useState("");
+  const [urlError, setUrlError] = useState("");
   const [hashInput, setHashInput] = useState("");
   const [hashOutput, setHashOutput] = useState("");
   const [hashError, setHashError] = useState("");
@@ -360,7 +361,8 @@ function Toolbox() {
       <article className="tool-card">
         <div className="tool-card-heading"><div><span className="tool-kicker">04 / WEB</span><h3>Codificador de URL</h3></div><FileSearch size={18}/></div>
         <textarea value={urlInput} onChange={e => setUrlInput(e.target.value)} placeholder="Digite o texto ou URL..." rows={5}/>
-        <div className="tool-actions"><button className="primary-button compact" onClick={() => setUrlOutput(encodeURIComponent(urlInput))} disabled={!urlInput}>Codificar</button><button onClick={() => {try {setUrlOutput(decodeURIComponent(urlInput));} catch {setUrlOutput("");setBase64Error("Sequência de URL inválida.");}}} disabled={!urlInput}>Decodificar</button><button onClick={() => {setUrlInput("");setUrlOutput("");}}>Limpar</button></div>
+        <div className="tool-actions"><button className="primary-button compact" onClick={() => setUrlOutput(encodeURIComponent(urlInput))} disabled={!urlInput}>Codificar</button><button onClick={() => {try {setUrlOutput(decodeURIComponent(urlInput));setUrlError("");} catch {setUrlOutput("");setUrlError("Sequência de URL inválida.");}}} disabled={!urlInput}>Decodificar</button><button onClick={() => {setUrlInput("");setUrlOutput("");}}>Limpar</button></div>
+        {urlError && <div className="tool-error">{urlError}</div>}
         {urlOutput && <div className="json-output"><div><span>RESULTADO</span><button onClick={() => void copy(urlOutput,"url")}>{copyLabel("url")}</button></div><pre>{urlOutput}</pre></div>}
       </article>
       <article className="tool-card">
