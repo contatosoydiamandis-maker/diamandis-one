@@ -32,36 +32,76 @@ fn core_diagnostic() -> String {
 }
 
 #[tauri::command]
-async fn list_directory(path: Option<String>, offset: Option<usize>, limit: Option<usize>) -> Result<DirectoryListing, String> {
+async fn list_directory(
+    path: Option<String>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+    query: Option<String>,
+    kind: Option<String>,
+    sort: Option<String>,
+) -> Result<DirectoryListing, String> {
     let offset = offset.unwrap_or(0);
     let limit = limit.unwrap_or(150).clamp(25, 500);
-    tauri::async_runtime::spawn_blocking(move || list_directory_impl(path, offset, limit)).await
-        .map_err(|_| "Não foi possível carregar esta pasta em segundo plano.".to_string())?
+    let query = query.unwrap_or_default();
+    let kind = kind.unwrap_or_else(|| "all".into());
+    let sort = sort.unwrap_or_else(|| "name".into());
+    tauri::async_runtime::spawn_blocking(move || {
+        list_directory_impl(path, offset, limit, query, kind, sort)
+    }).await.map_err(|_| "Não foi possível carregar esta pasta em segundo plano.".to_string())?
 }
 
-fn list_directory_impl(path: Option<String>, offset: usize, limit: usize) -> Result<DirectoryListing, String> {
+fn matches_directory_filters(name: &str, is_dir: bool, query: &str, kind: &str) -> bool {
+    let matches_query = query.is_empty() || name.to_lowercase().contains(query);
+    let matches_kind = match kind {
+        "folders" => is_dir,
+        "files" => !is_dir,
+        _ => true,
+    };
+    matches_query && matches_kind
+}
+
+fn list_directory_impl(
+    path: Option<String>,
+    offset: usize,
+    limit: usize,
+    query: String,
+    kind: String,
+    sort: String,
+) -> Result<DirectoryListing, String> {
+    if query.len() > 512 { return Err("O filtro de busca excede o limite permitido.".into()); }
+    if !matches!(kind.as_str(), "all" | "folders" | "files") {
+        return Err("O filtro de tipo informado é inválido.".into());
+    }
+    if !matches!(sort.as_str(), "name" | "size" | "type") {
+        return Err("A ordenação informada é inválida.".into());
+    }
+    let query = query.trim().to_lowercase();
     let requested = path.filter(|v| !v.trim().is_empty()).map(PathBuf::from).unwrap_or_else(home_dir);
     let canonical = requested.canonicalize().map_err(|e| friendly_io_error("acessar esta pasta", &e))?;
     if !canonical.is_dir() { return Err("O caminho informado não é uma pasta.".into()); }
     let iterator = fs::read_dir(&canonical).map_err(|e| friendly_io_error("listar esta pasta", &e))?;
     let mut candidates = Vec::new();
-    for item in iterator.flatten() {
+    for item in iterator {
+        let item = item.map_err(|e| friendly_io_error("ler um item desta pasta", &e))?;
         let item_path = item.path();
-        let file_type = item.file_type().ok();
-        candidates.push((
-            item.file_name().to_string_lossy().to_string(),
-            item_path,
-            file_type.as_ref().map(|kind| kind.is_dir()).unwrap_or(false),
-            file_type.as_ref().map(|kind| kind.is_symlink()).unwrap_or(false),
-        ));
-    }
-    candidates.sort_by_cached_key(|item| (std::cmp::Reverse(item.2), item.0.to_lowercase()));
-    let total = candidates.len();
-    let safe_offset = offset.min(total);
-    let entries = candidates.into_iter().skip(safe_offset).take(limit).map(|(name, item_path, is_dir, is_symlink)| {
+        let file_type = item.file_type().map_err(|e| friendly_io_error("identificar um item desta pasta", &e))?;
+        let name = item.file_name().to_string_lossy().to_string();
+        let is_dir = file_type.is_dir();
+        let is_symlink = file_type.is_symlink();
+        if !matches_directory_filters(&name, is_dir, &query, &kind) { continue; }
         let size = if !is_dir && !is_symlink {
             fs::metadata(&item_path).ok().filter(|metadata| metadata.is_file()).map(|metadata| metadata.len())
         } else { None };
+        candidates.push((name, item_path, is_dir, size));
+    }
+    candidates.sort_by(|a, b| match sort.as_str() {
+        "size" => b.3.unwrap_or(0).cmp(&a.3.unwrap_or(0)).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())),
+        "type" => b.2.cmp(&a.2).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())),
+        _ => b.2.cmp(&a.2).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())),
+    });
+    let total = candidates.len();
+    let safe_offset = offset.min(total);
+    let entries = candidates.into_iter().skip(safe_offset).take(limit).map(|(name, item_path, is_dir, size)| {
         FileEntry { name, path: item_path.to_string_lossy().to_string(), is_dir, size }
     }).collect();
     Ok(DirectoryListing {
@@ -72,6 +112,25 @@ fn list_directory_impl(path: Option<String>, offset: usize, limit: usize) -> Res
         limit,
         entries,
     })
+}
+
+#[cfg(test)]
+mod directory_filter_tests {
+    use super::matches_directory_filters;
+
+    #[test]
+    fn searches_names_case_insensitively_across_file_types() {
+        assert!(matches_directory_filters("SaveGame.DAT", false, "save", "all"));
+        assert!(!matches_directory_filters("Other.dat", false, "save", "all"));
+    }
+
+    #[test]
+    fn applies_folder_and_file_filters() {
+        assert!(matches_directory_filters("Saves", true, "", "folders"));
+        assert!(!matches_directory_filters("save.dat", false, "", "folders"));
+        assert!(matches_directory_filters("save.dat", false, "", "files"));
+        assert!(!matches_directory_filters("Saves", true, "", "files"));
+    }
 }
 
 #[tauri::command]
