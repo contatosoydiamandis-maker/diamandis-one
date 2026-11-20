@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
-  AppWindow, ArrowLeft, ArrowUpRight, Boxes, Check, CheckCircle2, ChevronRight, CircleHelp, Copy, Braces, Type,
+  AppWindow, ArrowLeft, ArrowUpRight, Boxes, Check, CheckCircle2, ChevronRight, Copy, Braces, Type,
   Clock3, Command, File, FileSearch, Folder, FolderKanban, FolderPlus, Gamepad2, HardDrive,
   Image, LayoutDashboard, LoaderCircle, RefreshCw, Search, Settings2, ShieldCheck, Sparkles,
   Wrench, Zap
@@ -37,6 +37,7 @@ const descriptions: Record<ModuleId, { title: string; subtitle: string }> = {
 function App() {
   const [active, setActive] = useState<ModuleId>("overview");
   const [search, setSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [diagnostic, setDiagnostic] = useState("Verificação ainda não executada");
 
   useEffect(() => {
@@ -54,6 +55,21 @@ function App() {
     }
   };
 
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+      }
+      if (event.key === "Escape" && document.activeElement === searchInputRef.current) {
+        setSearch("");
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
+
   const current = descriptions[active];
   const filtered = nav.filter(item => item.label.toLowerCase().includes(search.toLowerCase()));
 
@@ -68,7 +84,7 @@ function App() {
         <div className="sidebar-search">
           <Search size={15} />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Encontrar módulo..." />
-          <kbd>⌘ K</kbd>
+          <kbd>Ctrl K</kbd>
         </div>
 
         {["WORKSPACE", "GAMING", "SYSTEM"].map(group => (
@@ -92,7 +108,7 @@ function App() {
       <main className="main-area">
         <header className="topbar">
           <div className="breadcrumb"><span>DIAMANDIS ONE</span><ChevronRight size={13}/><strong>{current.title}</strong></div>
-          <div className="top-actions"><span className="system-status"><i/> PRÉ-ALPHA • EM DESENVOLVIMENTO</span><button className="icon-button" title="Ajuda"><CircleHelp size={17}/></button><div className="avatar">D</div></div>
+          <div className="top-actions"><span className="system-status"><i/> PRÉ-ALPHA • EM DESENVOLVIMENTO</span><div className="avatar">D</div></div>
         </header>
 
         <div className="content">
@@ -109,9 +125,9 @@ function App() {
 
             <div className="section-title"><div><h3>Seu workspace</h3><p>Escolha por onde começar</p></div><span className="section-count">03 MÓDULOS</span></div>
             <section className="module-grid">
-              <ModuleCard icon={FolderKanban} title="File Manager" desc="Organize arquivos, encontre duplicados e tenha controle sobre seu armazenamento." meta="ORGANIZAÇÃO" onClick={() => setActive("files")}/>
-              <ModuleCard icon={Wrench} title="Toolbox" desc="Conversores, ferramentas de imagem, texto e utilidades rápidas." meta="PRODUTIVIDADE" onClick={() => setActive("toolbox")}/>
-              <ModuleCard icon={Gamepad2} title="GameHub" desc="Sua coleção de jogos, launchers, favoritos e sessões." meta="GAMING" onClick={() => setActive("games")}/>
+              <ModuleCard icon={FolderKanban} title="File Manager" desc="Navegue, filtre, copie, mova, renomeie e envie itens à Lixeira." meta="ORGANIZAÇÃO" onClick={() => setActive("files")}/>
+              <ModuleCard icon={Wrench} title="Toolbox" desc="Ferramentas locais para transformar textos e formatar JSON." meta="PRODUTIVIDADE" onClick={() => setActive("toolbox")}/>
+              <ModuleCard icon={Gamepad2} title="GameHub" desc="Descubra jogos instalados e organize seus favoritos em um só lugar." meta="GAMING" onClick={() => setActive("games")}/>
             </section>
 
             <div className="section-title lower-title"><div><h3>Centro do sistema</h3><p>Base local e diagnóstico</p></div></div>
