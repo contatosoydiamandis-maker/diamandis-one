@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Archive, CheckCircle2, Clock3, FolderOpen, HardDrive, LoaderCircle, Plus, RefreshCw, RotateCcw, ShieldCheck } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -25,6 +25,7 @@ export default function SaveCenter() {
   const [games, setGames] = useState<SaveGame[]>([]);
   const [backups, setBackups] = useState<SaveBackup[]>([]);
   const [selectedGame, setSelectedGame] = useState("");
+  const selectedGameRef = useRef("");
   const [name, setName] = useState("");
   const [savePath, setSavePath] = useState("");
   const [adding, setAdding] = useState(false);
@@ -43,8 +44,8 @@ export default function SaveCenter() {
     try {
       const nextGames = await invoke<SaveGame[]>("list_save_games");
       const activeGameId = gameId || (
-        nextGames.some(game => game.id === selectedGame)
-          ? selectedGame
+        nextGames.some(game => game.id === selectedGameRef.current)
+          ? selectedGameRef.current
           : nextGames[0]?.id || ""
       );
       const nextBackups = activeGameId
@@ -52,10 +53,11 @@ export default function SaveCenter() {
         : [];
       setGames(nextGames);
       setBackups(nextBackups);
+      selectedGameRef.current = activeGameId;
       setSelectedGame(activeGameId);
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); }
-  }, [selectedGame]);
+  }, []);
 
   const refreshTotk = useCallback(async () => {
     try { const [campaigns, running, install] = await Promise.all([invoke<TotkCampaign[]>("list_totk_campaigns"), invoke<boolean>("is_totk_running"), invoke<string>("get_totk_install")]); setTotkCampaigns(campaigns); setTotkRunning(running); setTotkInstall(install); }
@@ -99,7 +101,8 @@ export default function SaveCenter() {
     setAdding(true); setError(""); setNotice("");
     try {
       const game = await invoke<SaveGame>("add_save_game", { name, savePath });
-      setName(""); setSavePath(""); setSelectedGame(game.id);
+      setName(""); setSavePath(""); selectedGameRef.current = game.id;
+      setSelectedGame(game.id);
       setNotice("Jogo cadastrado. A pasta original não foi modificada.");
       await refresh(game.id);
     } catch (e) { setError(String(e)); }
@@ -159,7 +162,7 @@ export default function SaveCenter() {
 
     <div className="save-center-layout">
       <div className="save-games-panel">
-        {games.length ? games.map(game => <button key={game.id} className={selectedGame === game.id ? "save-game-row active" : "save-game-row"} onClick={() => { setSelectedGame(game.id); void refresh(game.id); }}>
+        {games.length ? games.map(game => <button key={game.id} className={selectedGame === game.id ? "save-game-row active" : "save-game-row"} onClick={() => { selectedGameRef.current = game.id; setSelectedGame(game.id); void refresh(game.id); }}>
           <span className="save-game-icon"><Archive size={17}/></span><span className="save-game-copy"><strong>{game.name}</strong><small title={game.savePath}>{game.savePath}</small></span><span className="save-game-arrow">›</span>
         </button>) : <div className="save-empty"><FolderOpen size={24}/><strong>Nenhum jogo cadastrado</strong><span>Adicione a pasta onde o jogo guarda seus arquivos de progresso.</span></div>}
         <button className="save-add-toggle" onClick={() => setAdding(value => !value)}><Plus size={15}/> Adicionar jogo manualmente</button>
