@@ -140,6 +140,16 @@ export default function SaveCenter() {
     } catch (e) { setError(String(e)); }
   };
 
+  const verify = async (backup: SaveBackup) => {
+    if (!selected) return;
+    setWorkingId(backup.id); setError(""); setNotice("");
+    try {
+      const result = await invoke<string>("verify_save_backup", { backupId: backup.id, gameId: selected.id });
+      setNotice(result);
+    } catch (e) { setError(String(e)); }
+    finally { setWorkingId(""); }
+  };
+
   const restore = async (backup: SaveBackup) => {
     if (!selected) return;
     const accepted = window.confirm(`Antes de continuar, feche completamente o jogo para evitar que ele sobrescreva os arquivos restaurados.\n\nRestaurar o backup de ${formatDate(backup.createdAt)}? O save atual será preservado em uma pasta de segurança antes da troca.`);
@@ -209,6 +219,7 @@ export default function SaveCenter() {
           <div className="save-history-heading"><div><h4>Histórico de backups</h4><p>{backups.length} versão(ões) armazenada(s) localmente</p></div><Clock3 size={17}/></div>
           {busy ? <div className="save-empty"><LoaderCircle className="spin" size={22}/><span>Carregando histórico...</span></div> : backups.length ? <div className="save-backup-list">{backups.map(backup => <article className="save-backup-row" key={backup.id}>
             <div className="save-backup-icon"><Archive size={16}/></div><div className="save-backup-info"><strong>{formatDate(backup.createdAt)}</strong><span>{backup.fileCount} arquivo(s) • {formatSize(backup.sizeBytes)} • {Object.keys(backup.fileHashes || {}).length ? "SHA-256 verificado" : "Verificação estrutural"}</span><small>{backup.backupPath}</small></div>
+            <button className="game-icon-button" title="Verificar integridade deste backup" onClick={() => void verify(backup)} disabled={!!workingId}><ShieldCheck size={15}/></button>
             <button className="game-icon-button" title="Restaurar este backup" onClick={() => void restore(backup)} disabled={!!workingId}><RotateCcw size={15}/></button>
           </article>)}</div> : <div className="save-empty compact-empty"><Archive size={22}/><strong>Seu primeiro backup começa aqui</strong><span>Crie uma cópia antes de trocar ou atualizar seus saves.</span></div>}
         </> : !adding && <div className="save-empty save-select-empty"><HardDrive size={28}/><strong>Selecione um jogo</strong><span>Ou cadastre uma pasta de salvamento para começar.</span></div>}
