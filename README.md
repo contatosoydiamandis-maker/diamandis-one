@@ -22,8 +22,8 @@
 
 | Área | Estado |
 |---|---|
-| Dashboard e identidade visual | Monitoramento nativo de CPU, RAM e unidade do sistema no Windows; identidade visual e diagnóstico do core |
-| File Manager | Navegação, filtro, criação, renomeação, cópia, movimentação e Lixeira |
+| Dashboard e identidade visual | Monitoramento nativo de CPU, RAM e unidades fixas/removíveis montadas no Windows; identidade visual e diagnóstico do core |
+| File Manager | Navegação entre unidades, filtro, criação, renomeação, cópia, movimentação entre volumes com proteção contra perda e Lixeira |
 | Configurações | Tema escuro/claro/sistema e preferências persistentes |
 | Toolbox | Transformador de texto, JSON, Base64, URL, SHA-256 e UUID offline |
 | GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG; favoritos e abertura da pasta de instalação |
