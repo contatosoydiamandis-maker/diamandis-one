@@ -263,7 +263,7 @@ function FileManager() {
     {showNew && <form className="new-folder-form" onSubmit={create}><FolderPlus size={16}/><input autoFocus value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome da nova pasta"/><button className="primary-button compact" disabled={!newName.trim()}>Criar pasta</button><button type="button" className="toolbar-button" onClick={() => setShowNew(false)}>Cancelar</button></form>}
     {selected && <div className="file-selection-bar"><span><strong>{selected.name}</strong> selecionado</span><div>
       <button onClick={() => openAction("rename")}>Renomear</button>
-      {!selected.isDir && <button onClick={() => openAction("copy")}>Copiar</button>}
+      <button onClick={() => openAction("copy")}>Copiar</button>
       <button onClick={() => openAction("move")}>Mover</button>
       <button className="danger-action" onClick={() => openAction("delete")}>Enviar à Lixeira</button>
     </div></div>}
@@ -277,8 +277,8 @@ function FileManager() {
     <div className="file-pagination"><span>Mostrando {listing?.entries.length ?? 0} de {listing?.total ?? 0} itens nesta pasta</span><div><button className="toolbar-button" disabled={busy || page <= 0} onClick={() => listing && void load(listing.path, page - 1)}>Anterior</button><strong>{page + 1} / {pageCount}</strong><button className="toolbar-button" disabled={busy || page + 1 >= pageCount} onClick={() => listing && void load(listing.path, page + 1)}>Próxima</button></div></div>
     <div className="file-manager-foot"><ShieldCheck size={14}/> Exclusões vão para a Lixeira. Cópias e movimentos não sobrescrevem arquivos existentes.</div>
     {action && selected && <div className="file-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAction(null); }}><div className="file-modal" role="dialog" aria-modal="true" aria-labelledby="file-modal-title">
-      <h3 id="file-modal-title">{action === "rename" ? "Renomear item" : action === "copy" ? "Copiar arquivo" : action === "move" ? "Mover item" : "Enviar para a Lixeira"}</h3>
-      <p>{action === "delete" ? <>O item <strong>{selected.name}</strong> será enviado à Lixeira do Windows. Ele não será excluído permanentemente.</> : action === "rename" ? "Informe o novo nome. A extensão pode ser mantida ou alterada." : action === "copy" ? "Informe o caminho completo da pasta de destino. Arquivos existentes não serão sobrescritos." : "Informe o caminho completo da pasta de destino. A operação não atravessa discos diferentes."}</p>
+      <h3 id="file-modal-title">{action === "rename" ? "Renomear item" : action === "copy" ? "Copiar arquivo ou pasta" : action === "move" ? "Mover item" : "Enviar para a Lixeira"}</h3>
+      <p>{action === "delete" ? <>O item <strong>{selected.name}</strong> será enviado à Lixeira do Windows. Ele não será excluído permanentemente.</> : action === "rename" ? "Informe o novo nome. A extensão pode ser mantida ou alterada." : action === "copy" ? "Informe a pasta de destino. Arquivos e pastas serão copiados sem sobrescrever itens existentes; links simbólicos não são copiados." : "Informe a pasta de destino. Entre unidades diferentes, a cópia é concluída antes de a origem ser removida."}</p>
       {action !== "delete" && <input autoFocus value={actionValue} onChange={e => setActionValue(e.target.value)} placeholder={action === "rename" ? "Novo nome" : "C:\\Caminho\\da\\pasta"}/>}
       <div className="file-modal-actions"><button className="toolbar-button" onClick={() => setAction(null)}>Cancelar</button><button className={action === "delete" ? "danger-button" : "primary-button compact"} onClick={() => void runAction()} disabled={action !== "delete" && !actionValue.trim()}>{action === "delete" ? "Enviar à Lixeira" : "Confirmar"}</button></div>
     </div></div>}
