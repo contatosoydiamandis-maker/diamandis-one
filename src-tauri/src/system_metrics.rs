@@ -32,7 +32,7 @@ pub struct SystemMetrics {
 
 #[cfg(windows)]
 fn collect() -> Result<SystemMetrics, String> {
-    use std::{env, ffi::OsStr, os::windows::ffi::OsStrExt, path::PathBuf};
+    use std::{ffi::OsStr, os::windows::ffi::OsStrExt};
 
     #[repr(C)]
     #[derive(Clone, Copy, Default)]
@@ -167,10 +167,6 @@ fn collect() -> Result<SystemMetrics, String> {
     storage_drives.sort_by(|a, b| a.letter.cmp(&b.letter));
     let storage_total_bytes = storage_drives.iter().try_fold(0u64, |sum, drive| sum.checked_add(drive.total_bytes));
     let storage_free_bytes = storage_drives.iter().try_fold(0u64, |sum, drive| sum.checked_add(drive.free_bytes));
-
-    // Keep the legacy aggregate fields useful to existing UI consumers.
-    let _system_drive = env::var_os("SystemDrive").unwrap_or_else(|| OsStr::new("C:").to_os_string());
-    let _ = PathBuf::from(_system_drive);
 
     Ok(SystemMetrics {
         cpu_usage_percent,
