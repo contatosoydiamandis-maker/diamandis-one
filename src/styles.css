@@ -296,3 +296,22 @@ button{ -webkit-tap-highlight-color:transparent }
 :root[data-theme="light"] .system-dashboard-foot{border-color:#e9e2ef}
 @media(max-width:1050px){.system-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.system-dashboard{padding:12px}.system-metric-grid{grid-template-columns:1fr 1fr}.system-metric-card{padding:10px}.system-metric-value{font-size:19px}.system-dashboard-foot{flex-direction:column}}
+
+.system-drives{margin-top:16px;padding-top:14px;border-top:1px solid #ffffff0c}
+.system-drives-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.system-drives-heading h4{margin:0;color:#e8e0ef;font-size:12px;font-weight:650}
+.system-drives-heading>span{color:#92879e;font:8px ui-monospace,monospace;letter-spacing:.5px}
+.system-drive-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.system-drive-card{min-width:0;padding:12px;border:1px solid #393044;border-radius:9px;background:linear-gradient(145deg,#1c1924,#121119)}
+.system-drive-heading{display:flex;align-items:center;gap:9px;min-width:0}
+.system-drive-heading>div{display:flex;flex:1;flex-direction:column;min-width:0;gap:3px}
+.system-drive-heading strong{overflow:hidden;color:#eee5f5;font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.system-drive-heading small{color:#94899f;font-size:9px}
+.system-drive-percent{color:#c7a8e8;font:10px ui-monospace,monospace}
+.system-drive-track{height:5px;margin:12px 0 8px;overflow:hidden;border-radius:5px;background:#342c40}
+.system-drive-track i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#8261b1,#c2a0e8);transition:width .35s ease}
+.system-drive-capacity{display:flex;justify-content:space-between;gap:8px;color:#94899f;font-size:8px}
+:root[data-theme="light"] .system-drives-heading h4{color:#302638}
+:root[data-theme="light"] .system-drive-card{border-color:#ddd4e5;background:#fff}
+:root[data-theme="light"] .system-drive-heading strong{color:#302638}
+:root[data-theme="light"] .system-drive-heading small,:root[data-theme="light"] .system-drive-capacity,:root[data-theme="light"] .system-drives-heading>span{color:#71667a}

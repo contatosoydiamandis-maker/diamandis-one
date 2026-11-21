@@ -27,8 +27,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Build frontend
-        run: npm run build
+      - name: Check frontend and build production bundle
+        run: npm run check
       - name: Upload generated npm lockfile
         if: always()
         uses: actions/upload-artifact@v4

@@ -151,10 +151,12 @@ function App() {
 function FileManager() {
   type Entry = { name: string; path: string; isDir: boolean; size: number | null };
   type Listing = { path: string; parent: string | null; total: number; offset: number; limit: number; entries: Entry[] };
+  type Drive = { letter: string; name: string; driveType: string };
   const PAGE_SIZE = 150;
   type Preferences = { theme: string; defaultFolder: string; confirmBeforeDelete: boolean; openLastFolder: boolean; lastFolder: string };
   type ActionMode = "rename" | "copy" | "move" | "delete";
   const [listing, setListing] = useState<Listing | null>(null);
+  const [drives, setDrives] = useState<Drive[]>([]);
   const [path, setPath] = useState("");
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState("");
@@ -196,6 +198,9 @@ function FileManager() {
 
   useEffect(() => {
     let active = true;
+    void invoke<{ storageDrives: Drive[] }>("get_system_metrics")
+      .then(metrics => { if (active) setDrives(metrics.storageDrives ?? []); })
+      .catch(() => { if (active) setDrives([]); });
     invoke<Preferences>("load_settings").then(settings => {
       if (!active) return;
       setPreferences(settings);
@@ -214,6 +219,7 @@ function FileManager() {
   }, [filter, kindFilter, sortBy, settingsLoaded]);
 
   const pageCount = Math.max(1, Math.ceil((listing?.total ?? 0) / PAGE_SIZE));
+  const currentDrive = /^[A-Za-z]:/.test(path) ? path.slice(0, 2).toUpperCase() : "";
   const visible = listing?.entries ?? [];
   const create = async (event: FormEvent) => {
     event.preventDefault(); if (!listing || !newName.trim()) return;
@@ -249,11 +255,15 @@ function FileManager() {
       <button className="toolbar-button" disabled={!listing?.parent || busy} onClick={() => listing?.parent && void load(listing.parent)} title="Pasta anterior"><ArrowLeft size={16}/></button>
       <form className="path-form" onSubmit={e => {e.preventDefault(); void load(path);}}><HardDrive size={15}/><input aria-label="Caminho da pasta" value={path} onChange={e => setPath(e.target.value)} placeholder="Caminho da pasta..."/></form>
       <button className="toolbar-button" disabled={busy} onClick={() => void load(path || undefined)} title="Atualizar"><RefreshCw size={15}/></button>
+      <select className="file-sort file-drive-select" aria-label="Trocar unidade de armazenamento" value={currentDrive} disabled={busy || drives.length === 0} onChange={e => { const drive = drives.find(item => item.letter === e.target.value); if (drive) void load(`${drive.letter}\\`); }}>
+        <option value="">Unidades</option>
+        {drives.map(drive => <option key={drive.letter} value={drive.letter}>{drive.name} ({drive.letter})</option>)}
+      </select>
     </div><button className="primary-button compact" onClick={() => setShowNew(v => !v)}><FolderPlus size={15}/> Nova pasta</button></div>
     {showNew && <form className="new-folder-form" onSubmit={create}><FolderPlus size={16}/><input autoFocus value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome da nova pasta"/><button className="primary-button compact" disabled={!newName.trim()}>Criar pasta</button><button type="button" className="toolbar-button" onClick={() => setShowNew(false)}>Cancelar</button></form>}
     {selected && <div className="file-selection-bar"><span><strong>{selected.name}</strong> selecionado</span><div>
       <button onClick={() => openAction("rename")}>Renomear</button>
-      {!selected.isDir && <button onClick={() => openAction("copy")}>Copiar</button>}
+      <button onClick={() => openAction("copy")}>Copiar</button>
       <button onClick={() => openAction("move")}>Mover</button>
       <button className="danger-action" onClick={() => openAction("delete")}>Enviar à Lixeira</button>
     </div></div>}
@@ -267,8 +277,8 @@ function FileManager() {
     <div className="file-pagination"><span>Mostrando {listing?.entries.length ?? 0} de {listing?.total ?? 0} itens nesta pasta</span><div><button className="toolbar-button" disabled={busy || page <= 0} onClick={() => listing && void load(listing.path, page - 1)}>Anterior</button><strong>{page + 1} / {pageCount}</strong><button className="toolbar-button" disabled={busy || page + 1 >= pageCount} onClick={() => listing && void load(listing.path, page + 1)}>Próxima</button></div></div>
     <div className="file-manager-foot"><ShieldCheck size={14}/> Exclusões vão para a Lixeira. Cópias e movimentos não sobrescrevem arquivos existentes.</div>
     {action && selected && <div className="file-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAction(null); }}><div className="file-modal" role="dialog" aria-modal="true" aria-labelledby="file-modal-title">
-      <h3 id="file-modal-title">{action === "rename" ? "Renomear item" : action === "copy" ? "Copiar arquivo" : action === "move" ? "Mover item" : "Enviar para a Lixeira"}</h3>
-      <p>{action === "delete" ? <>O item <strong>{selected.name}</strong> será enviado à Lixeira do Windows. Ele não será excluído permanentemente.</> : action === "rename" ? "Informe o novo nome. A extensão pode ser mantida ou alterada." : action === "copy" ? "Informe o caminho completo da pasta de destino. Arquivos existentes não serão sobrescritos." : "Informe o caminho completo da pasta de destino. A operação não atravessa discos diferentes."}</p>
+      <h3 id="file-modal-title">{action === "rename" ? "Renomear item" : action === "copy" ? "Copiar arquivo ou pasta" : action === "move" ? "Mover item" : "Enviar para a Lixeira"}</h3>
+      <p>{action === "delete" ? <>O item <strong>{selected.name}</strong> será enviado à Lixeira do Windows. Ele não será excluído permanentemente.</> : action === "rename" ? "Informe o novo nome. A extensão pode ser mantida ou alterada." : action === "copy" ? "Informe a pasta de destino. Arquivos e pastas serão copiados sem sobrescrever itens existentes; links simbólicos não são copiados." : "Informe a pasta de destino. Entre unidades diferentes, a cópia é concluída antes de a origem ser removida."}</p>
       {action !== "delete" && <input autoFocus value={actionValue} onChange={e => setActionValue(e.target.value)} placeholder={action === "rename" ? "Novo nome" : "C:\\Caminho\\da\\pasta"}/>}
       <div className="file-modal-actions"><button className="toolbar-button" onClick={() => setAction(null)}>Cancelar</button><button className={action === "delete" ? "danger-button" : "primary-button compact"} onClick={() => void runAction()} disabled={action !== "delete" && !actionValue.trim()}>{action === "delete" ? "Enviar à Lixeira" : "Confirmar"}</button></div>
     </div></div>}
