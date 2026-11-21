@@ -151,10 +151,12 @@ function App() {
 function FileManager() {
   type Entry = { name: string; path: string; isDir: boolean; size: number | null };
   type Listing = { path: string; parent: string | null; total: number; offset: number; limit: number; entries: Entry[] };
+  type Drive = { letter: string; name: string; driveType: string };
   const PAGE_SIZE = 150;
   type Preferences = { theme: string; defaultFolder: string; confirmBeforeDelete: boolean; openLastFolder: boolean; lastFolder: string };
   type ActionMode = "rename" | "copy" | "move" | "delete";
   const [listing, setListing] = useState<Listing | null>(null);
+  const [drives, setDrives] = useState<Drive[]>([]);
   const [path, setPath] = useState("");
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState("");
@@ -214,6 +216,7 @@ function FileManager() {
   }, [filter, kindFilter, sortBy, settingsLoaded]);
 
   const pageCount = Math.max(1, Math.ceil((listing?.total ?? 0) / PAGE_SIZE));
+  const currentDrive = /^[A-Za-z]:/.test(path) ? path.slice(0, 2).toUpperCase() : "";
   const visible = listing?.entries ?? [];
   const create = async (event: FormEvent) => {
     event.preventDefault(); if (!listing || !newName.trim()) return;
@@ -249,6 +252,10 @@ function FileManager() {
       <button className="toolbar-button" disabled={!listing?.parent || busy} onClick={() => listing?.parent && void load(listing.parent)} title="Pasta anterior"><ArrowLeft size={16}/></button>
       <form className="path-form" onSubmit={e => {e.preventDefault(); void load(path);}}><HardDrive size={15}/><input aria-label="Caminho da pasta" value={path} onChange={e => setPath(e.target.value)} placeholder="Caminho da pasta..."/></form>
       <button className="toolbar-button" disabled={busy} onClick={() => void load(path || undefined)} title="Atualizar"><RefreshCw size={15}/></button>
+      <select className="file-sort file-drive-select" aria-label="Trocar unidade de armazenamento" value={currentDrive} disabled={busy || drives.length === 0} onChange={e => { const drive = drives.find(item => item.letter === e.target.value); if (drive) void load(`${drive.letter}\\\\`); }}>
+        <option value="">Unidades</option>
+        {drives.map(drive => <option key={drive.letter} value={drive.letter}>{drive.name} ({drive.letter})</option>)}
+      </select>
     </div><button className="primary-button compact" onClick={() => setShowNew(v => !v)}><FolderPlus size={15}/> Nova pasta</button></div>
     {showNew && <form className="new-folder-form" onSubmit={create}><FolderPlus size={16}/><input autoFocus value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome da nova pasta"/><button className="primary-button compact" disabled={!newName.trim()}>Criar pasta</button><button type="button" className="toolbar-button" onClick={() => setShowNew(false)}>Cancelar</button></form>}
     {selected && <div className="file-selection-bar"><span><strong>{selected.name}</strong> selecionado</span><div>
