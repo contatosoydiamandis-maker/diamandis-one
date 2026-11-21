@@ -63,17 +63,23 @@ pub async fn copy_file(path: String, destination_folder_path: String) -> Result<
 
 fn copy_file_impl(path: String, destination_folder_path: String) -> Result<(), String> {
     let source = existing_item(&path)?;
-    if !source.is_file() {
-        return Err("A cópia de pastas ainda não está disponível. Selecione um arquivo.".into());
-    }
     let folder = destination_folder(&destination_folder_path)?;
     let name = source.file_name().ok_or("Nome de arquivo inválido.")?;
     let destination = folder.join(name);
     if destination.exists() {
         return Err("Já existe um item com esse nome no destino. Nada foi sobrescrito.".into());
     }
-    copy_file_new(&source, &destination)
-        .map_err(|_| "Não foi possível concluir a cópia. Verifique as permissões e o espaço disponível; a origem foi preservada.".into())
+    if folder.starts_with(&source) {
+        return Err("Não é possível copiar uma pasta para dentro dela mesma ou de uma subpasta.".into());
+    }
+    let result = if source.is_dir() {
+        copy_directory_new(&source, &destination)
+    } else if source.is_file() {
+        copy_file_new(&source, &destination)
+    } else {
+        return Err("Este tipo de item não pode ser copiado.".into());
+    };
+    result.map_err(|_| "Não foi possível concluir a cópia. Verifique as permissões e o espaço disponível; a origem foi preservada e a cópia incompleta foi removida.".into())
 }
 
 fn copy_file_new(source: &Path, destination: &Path) -> io::Result<()> {
