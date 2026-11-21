@@ -165,8 +165,14 @@ fn collect() -> Result<SystemMetrics, String> {
     }
 
     storage_drives.sort_by(|a, b| a.letter.cmp(&b.letter));
-    let storage_total_bytes = storage_drives.iter().try_fold(0u64, |sum, drive| sum.checked_add(drive.total_bytes));
-    let storage_free_bytes = storage_drives.iter().try_fold(0u64, |sum, drive| sum.checked_add(drive.free_bytes));
+    let (storage_total_bytes, storage_free_bytes) = if storage_drives.is_empty() {
+        (None, None)
+    } else {
+        (
+            storage_drives.iter().try_fold(0u64, |sum, drive| sum.checked_add(drive.total_bytes)),
+            storage_drives.iter().try_fold(0u64, |sum, drive| sum.checked_add(drive.free_bytes)),
+        )
+    };
 
     Ok(SystemMetrics {
         cpu_usage_percent,
