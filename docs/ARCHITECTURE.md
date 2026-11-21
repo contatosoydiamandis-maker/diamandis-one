@@ -42,11 +42,11 @@
 
 ### Dashboard
 
-CPU é calculada por deltas de `GetSystemTimes`; RAM usa `GlobalMemoryStatusEx`; armazenamento usa `GetDiskFreeSpaceExW`. Leituras acontecem no backend e fora da thread de interface. A UI limita a frequência de atualização e compartilha requisições simultâneas para não duplicar consultas. GPU permanece explicitamente indisponível até existir um provedor confiável.
+CPU é calculada por deltas de `GetSystemTimes`; RAM usa `GlobalMemoryStatusEx`; armazenamento enumera unidades fixas e removíveis montadas no Windows, consultando espaço por volume. Leituras acontecem no backend e fora da thread de interface. A UI limita a frequência de atualização e compartilha requisições simultâneas para não duplicar consultas. GPU permanece explicitamente indisponível até existir um provedor confiável.
 
 ### File Manager
 
-A listagem é executada fora da thread principal, com paginação, filtros e ordenação no backend. Operações de alteração validam nomes e caminhos, recusam links simbólicos e não sobrescrevem destinos. Exclusão usa a Lixeira do sistema.
+A listagem é executada fora da thread principal, com paginação, filtros e ordenação no backend. O seletor de unidades permite alternar entre volumes detectados. Operações de alteração validam nomes e caminhos, recusam links simbólicos e não sobrescrevem destinos. Movimentações no mesmo volume usam rename; entre volumes, o backend copia arquivos ou árvores de diretórios para um destino novo, sincroniza os arquivos e só então remove a origem. Se a cópia falhar, a origem permanece; se a remoção final falhar, ambas as cópias permanecem e a UI recebe um erro explícito. Links simbólicos e tipos especiais são recusados na cópia entre volumes. Exclusão usa a Lixeira do sistema.
 
 ### GameHub
 
@@ -65,6 +65,7 @@ A instalação é identificada por `totk.exe`. Importação copia o perfil para 
 - Permissões Tauri são mínimas e explícitas.
 - Caminhos fornecidos pela interface são validados novamente no Rust.
 - Links simbólicos são recusados em operações sensíveis.
+- Cópias entre volumes nunca sobrescrevem destinos e mantêm a origem até a cópia terminar.
 - Catálogos e preferências usam gravação atômica.
 - Operações mutáveis do Save Center e do adaptador TOTK compartilham lock de processo.
 - A UI nunca deve substituir validações do backend por validações apenas visuais.
