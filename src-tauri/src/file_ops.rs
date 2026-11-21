@@ -129,7 +129,7 @@ fn is_cross_device_error(error: &io::Error) -> bool {
     #[cfg(unix)]
     { error.raw_os_error() == Some(18) }
     #[cfg(not(any(windows, unix)))]
-    { error.kind() == io::ErrorKind::CrossesDevices }
+    { let _ = error; false }
 }
 
 fn remove_moved_source(source: &Path) -> io::Result<()> {
@@ -194,7 +194,7 @@ fn delete_item_impl(path: String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{copy_directory_new, move_item_impl, validate_name};
+    use super::{copy_directory_new, copy_file_new, move_item_impl, validate_name};
     use std::{fs, time::{SystemTime, UNIX_EPOCH}};
 
     fn temp_root(label: &str) -> std::path::PathBuf {
@@ -217,6 +217,20 @@ mod tests {
         for name in ["", " ", "..", "../outside", "folder\\\\child", "CON", "NUL.txt", "COM1", "LPT9.log", "NUL .txt", "CONOUT$", "COM¹", "bad?.txt", "trailing."] {
             assert!(validate_name(name).is_err(), "name should be rejected: {name}");
         }
+    }
+
+    #[test]
+    fn refuses_to_overwrite_an_existing_file_during_copy() {
+        let root = temp_root("no-overwrite");
+        let source = root.join("source.txt");
+        let destination = root.join("destination.txt");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&destination, b"keep me").unwrap();
+
+        assert!(copy_file_new(&source, &destination).is_err());
+        assert_eq!(fs::read(&destination).unwrap(), b"keep me");
+        assert_eq!(fs::read(&source).unwrap(), b"source");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
