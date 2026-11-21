@@ -40,6 +40,7 @@ npm run tauri build
 - [ ] Testes e verificações executados.
 - [ ] Documentação atualizada.
 - [ ] Operações de arquivos e backups revisadas quanto a sobrescrita e perda de dados.
+- [ ] Cópias entre volumes testadas com arquivos, pastas aninhadas, destino existente e links simbólicos.
 - [ ] Limitações conhecidas registradas.
 - [ ] Nenhuma afirmação de compatibilidade sem teste real.
 
