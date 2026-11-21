@@ -200,7 +200,7 @@ fn delete_item_impl(path: String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{copy_directory_new, copy_file_new, move_item_impl, validate_name};
+    use super::{copy_directory_new, copy_file_impl, copy_file_new, move_item_impl, validate_name};
     use std::{fs, time::{SystemTime, UNIX_EPOCH}};
 
     fn temp_root(label: &str) -> std::path::PathBuf {
@@ -236,6 +236,39 @@ mod tests {
         assert!(copy_file_new(&source, &destination).is_err());
         assert_eq!(fs::read(&destination).unwrap(), b"keep me");
         assert_eq!(fs::read(&source).unwrap(), b"source");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn copies_a_folder_from_the_file_manager_and_preserves_the_source() {
+        let root = temp_root("copy-folder");
+        let source = root.join("source");
+        let destination_root = root.join("destination-root");
+        fs::create_dir_all(source.join("nested")).unwrap();
+        fs::create_dir_all(&destination_root).unwrap();
+        fs::write(source.join("nested/save.dat"), b"game-save").unwrap();
+
+        copy_file_impl(
+            source.to_string_lossy().into_owned(),
+            destination_root.to_string_lossy().into_owned(),
+        ).unwrap();
+
+        assert_eq!(fs::read(destination_root.join("source/nested/save.dat")).unwrap(), b"game-save");
+        assert!(source.join("nested/save.dat").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn refuses_to_copy_a_folder_into_itself() {
+        let root = temp_root("copy-descendant");
+        let source = root.join("source");
+        fs::create_dir_all(source.join("nested")).unwrap();
+        let result = copy_file_impl(
+            source.to_string_lossy().into_owned(),
+            source.join("nested").to_string_lossy().into_owned(),
+        );
+        assert!(result.is_err());
+        assert!(source.join("nested").is_dir());
         fs::remove_dir_all(root).unwrap();
     }
 
