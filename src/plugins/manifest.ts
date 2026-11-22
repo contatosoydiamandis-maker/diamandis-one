@@ -25,7 +25,7 @@ export type ManifestValidation =
 
 const permissionSet = new Set<string>(PLUGIN_PERMISSIONS);
 const pluginIdPattern = /^[a-z0-9][a-z0-9.-]{1,63}$/;
-const versionPattern = /^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?$/;
+const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/;
 
 export function validatePluginManifest(input: unknown): ManifestValidation {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
