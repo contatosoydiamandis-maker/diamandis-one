@@ -315,3 +315,10 @@ button{ -webkit-tap-highlight-color:transparent }
 :root[data-theme="light"] .system-drive-card{border-color:#ddd4e5;background:#fff}
 :root[data-theme="light"] .system-drive-heading strong{color:#302638}
 :root[data-theme="light"] .system-drive-heading small,:root[data-theme="light"] .system-drive-capacity,:root[data-theme="light"] .system-drives-heading>span{color:#71667a}
+
+/* Toolbox: campos adicionais de conversão */
+.tool-field-label{display:flex;flex-direction:column;gap:7px;margin:8px 0;color:#b9adc9;font-size:9px}
+.tool-field-label input{height:36px;padding:0 10px;border:1px solid #3b3347;border-radius:6px;background:#0e0d14;color:#eee;font-size:11px;outline:0}
+.tool-field-label input:focus{border-color:#9874bc;box-shadow:0 0 0 3px #9874bc18}
+:root[data-theme="light"] .tool-field-label{color:#62596e}
+:root[data-theme="light"] .tool-field-label input{background:#fff;color:#30263d;border-color:#ded4e8}
