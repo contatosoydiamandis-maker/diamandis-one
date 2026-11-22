@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, LoaderCircle, Moon, Monitor, Sun } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { setThemePreference } from "../theme";
+import { validatePluginManifest } from "../plugins/manifest";
 
 type SettingsValue = {
   theme: "dark" | "light" | "system";
@@ -25,6 +26,9 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [pluginJson, setPluginJson] = useState('{"id":"com.example.sample","name":"Plugin de exemplo","version":"1.0.0","apiVersion":1,"description":"Uma extensão local de exemplo.","permissions":["ui.panel"]}');
+  const [pluginResult, setPluginResult] = useState("");
+  const [pluginValid, setPluginValid] = useState<boolean | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -41,6 +45,19 @@ export default function Settings() {
 
   const update = <K extends keyof SettingsValue>(key: K, next: SettingsValue[K]) =>
     setValue(current => ({ ...current, [key]: next }));
+
+  const validatePlugin = () => {
+    try {
+      const result = validatePluginManifest(JSON.parse(pluginJson));
+      setPluginValid(result.valid);
+      setPluginResult(result.valid
+        ? `Manifesto válido: ${result.manifest.name} • API ${result.manifest.apiVersion} • ${result.manifest.permissions.length} permissão(ões) solicitada(s).`
+        : result.error);
+    } catch {
+      setPluginValid(false);
+      setPluginResult("JSON inválido. Revise a sintaxe do manifesto.");
+    }
+  };
 
   const save = async () => {
     setSaving(true); setError(""); setMessage("");
@@ -71,6 +88,14 @@ export default function Settings() {
       <label className="settings-field"><span>Pasta inicial preferida</span><input value={value.defaultFolder} onChange={e => update("defaultFolder", e.target.value)} placeholder="Ex.: C:\\Users\\Você\\Documents"/><small>Deixe vazio para abrir sua pasta de usuário. O caminho será validado ao abrir.</small></label>
       <label className="settings-toggle"><span><strong>Confirmar antes de enviar à Lixeira</strong><small>Evita exclusões acidentais.</small></span><input type="checkbox" checked={value.confirmBeforeDelete} onChange={e => update("confirmBeforeDelete", e.target.checked)}/></label>
       <label className="settings-toggle"><span><strong>Reabrir a última pasta utilizada</strong><small>Retoma o local de trabalho na próxima sessão.</small></span><input type="checkbox" checked={value.openLastFolder} onChange={e => update("openLastFolder", e.target.checked)}/></label>
+    </article>
+
+    <article className="settings-card">
+      <div className="settings-heading"><div><span className="tool-kicker">EXTENSIBILIDADE • API V1</span><h3>Validador de plugins</h3><p>Confira o manifesto JSON de uma extensão antes de integrá-la ao ecossistema DIAMANDIS ONE.</p></div></div>
+      <label className="settings-field"><span>Manifesto JSON</span><textarea value={pluginJson} onChange={e => { setPluginJson(e.target.value); setPluginValid(null); setPluginResult(""); }} rows={7} spellCheck={false}/><small>Permissões reconhecidas: ui.panel, tool.action, filesystem.read, filesystem.write e process.launch.</small></label>
+      <div className="settings-actions"><button className="secondary-button" onClick={() => setPluginJson('{"id":"com.example.sample","name":"Plugin de exemplo","version":"1.0.0","apiVersion":1,"description":"Uma extensão local de exemplo.","permissions":["ui.panel"]}')}>Exemplo</button><button className="primary-button compact" onClick={validatePlugin}>Validar manifesto</button></div>
+      {pluginResult && <div className={pluginValid ? "settings-feedback" : "settings-feedback error"} role="status">{pluginResult}</div>}
+      <small className="settings-hint">A validação de manifestos está disponível. O carregamento e a execução dinâmica de plugins externos permanecem desativados nesta pré-alpha por segurança.</small>
     </article>
 
     <div className="settings-footer">
