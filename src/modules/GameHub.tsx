@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, FolderOpen, Gamepad2, Heart, LoaderCircle, RefreshCw, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { Copy, FolderOpen, Gamepad2, Heart, LoaderCircle, Play, RefreshCw, Search, Settings2, ShieldCheck, Sparkles } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 
 type Game = { name: string; source: string; path: string };
 type SourceFilter = "Todos" | "Steam" | "Epic Games" | "GOG";
@@ -29,6 +30,11 @@ export default function GameHub() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [copied, setCopied] = useState("");
   const [openingPath, setOpeningPath] = useState("");
+  const [launchingPath, setLaunchingPath] = useState("");
+  const [launchTargets, setLaunchTargets] = useState<Record<string, string>>(() => {
+    try { const value: unknown = JSON.parse(localStorage.getItem("diamandis.gamehub.launchTargets") || "{}"); return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, string> : {}; }
+    catch { return {}; }
+  });
   const copyTimer = useRef<number | null>(null);
 
   useEffect(() => () => {
@@ -100,6 +106,39 @@ export default function GameHub() {
     }
   };
 
+
+  const configureExecutable = async (game: Game) => {
+    setError("");
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        defaultPath: game.path,
+        title: `Selecione o executável de ${game.name}`,
+        filters: [{ name: "Executáveis Windows", extensions: ["exe"] }]
+      });
+      if (typeof selected !== "string") return;
+      const next = { ...launchTargets, [game.path]: selected };
+      setLaunchTargets(next);
+      try { localStorage.setItem("diamandis.gamehub.launchTargets", JSON.stringify(next)); }
+      catch { setError("Executável configurado nesta sessão, mas não foi possível persistir a preferência local."); }
+    } catch (e) { setError(String(e)); }
+  };
+
+  const launchGame = async (game: Game) => {
+    const executable = launchTargets[game.path];
+    if (!executable) { await configureExecutable(game); return; }
+    setLaunchingPath(game.path);
+    setError("");
+    try {
+      await invoke("launch_game", { gameFolderPath: game.path, executablePath: executable });
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLaunchingPath("");
+    }
+  };
+
   const counts = useMemo(() => ({
     steam: games.filter(game => game.source === "Steam").length,
     epic: games.filter(game => game.source === "Epic Games").length,
@@ -135,10 +174,10 @@ export default function GameHub() {
       filtered.length ? <div className="gamehub-grid">{filtered.map(game => <article className="game-card" key={game.path}>
         <div className="game-card-cover"><Gamepad2 size={25}/><span>{game.source}</span></div>
         <div className="game-card-main"><strong title={game.name}>{game.name}</strong><span className="game-card-platform">{game.source} <i/> INSTALADO</span><code title={game.path}>{game.path}</code></div>
-        <div className="game-card-actions"><button className={favorites.includes(game.path) ? "game-icon-button favorite" : "game-icon-button"} onClick={() => toggleFavorite(game.path)} title="Adicionar aos favoritos" aria-label={favorites.includes(game.path) ? "Remover dos favoritos" : "Adicionar aos favoritos"}><Heart size={15} fill={favorites.includes(game.path) ? "currentColor" : "none"}/></button><button className="game-icon-button" onClick={() => void copyPath(game.path)} title="Copiar caminho" aria-label="Copiar caminho da instalação"><Copy size={15}/></button><button className="game-icon-button" onClick={() => void openGameFolder(game.path)} title="Abrir pasta de instalação" aria-label="Abrir pasta de instalação" disabled={openingPath === game.path}><FolderOpen size={15}/></button></div>
+        <div className="game-card-actions"><button className={favorites.includes(game.path) ? "game-icon-button favorite" : "game-icon-button"} onClick={() => toggleFavorite(game.path)} title="Adicionar aos favoritos" aria-label={favorites.includes(game.path) ? "Remover dos favoritos" : "Adicionar aos favoritos"}><Heart size={15} fill={favorites.includes(game.path) ? "currentColor" : "none"}/></button><button className="game-icon-button" onClick={() => void copyPath(game.path)} title="Copiar caminho" aria-label="Copiar caminho da instalação"><Copy size={15}/></button><button className="game-icon-button" onClick={() => void openGameFolder(game.path)} title="Abrir pasta de instalação" aria-label="Abrir pasta de instalação" disabled={openingPath === game.path}><FolderOpen size={15}/></button><button className="game-icon-button" onClick={() => void configureExecutable(game)} title="Selecionar executável do jogo" aria-label="Selecionar executável do jogo"><Settings2 size={15}/></button><button className="game-icon-button" onClick={() => void launchGame(game)} title={launchTargets[game.path] ? "Iniciar jogo" : "Configurar executável para iniciar"} aria-label={launchTargets[game.path] ? "Iniciar jogo" : "Configurar executável para iniciar"} disabled={launchingPath === game.path}>{launchingPath === game.path ? <LoaderCircle className="spin" size={15}/> : <Play size={15}/>}</button></div>
         {copied === game.path && <span className="game-copy-feedback">Caminho copiado</span>}
       </article>)}</div> :
       <div className="gamehub-empty"><Gamepad2 size={31}/><strong>{games.length ? "Nenhum jogo corresponde à busca" : "Sua biblioteca ainda está vazia"}</strong><span>{games.length ? "Experimente outro nome ou remova os filtros." : "O GameHub procura instalações conhecidas de Steam, Epic Games e GOG."}</span>{games.length > 0 && <button className="secondary-button" onClick={() => {setQuery("");setSource("Todos");setShowFavorites(false);}}>Limpar filtros</button>}</div>}
-    <div className="gamehub-foot"><ShieldCheck size={14}/> Varredura local somente leitura • Favoritos armazenados neste computador • Mais launchers serão adicionados gradualmente.</div>
+    <div className="gamehub-foot"><ShieldCheck size={14}/> Varredura local somente leitura • Executáveis escolhidos por você • Inicialização direta sem comandos de shell.</div>
   </section>;
 }
