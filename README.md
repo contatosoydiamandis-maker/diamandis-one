@@ -24,7 +24,7 @@
 |---|---|
 | Dashboard e identidade visual | Monitoramento nativo de CPU, RAM e unidades fixas/removíveis montadas no Windows; identidade visual e diagnóstico do core |
 | File Manager | Navegação entre unidades, filtro, criação, renomeação, cópia de arquivos e pastas, movimentação entre volumes com proteção contra perda e Lixeira |
-| Configurações | Tema escuro/claro/sistema e preferências persistentes |
+| Configurações | Tema escuro/claro/sistema, preferências persistentes e validador de manifesto de plugins API v1 |
 | Toolbox | Texto, JSON, Base64, URL, SHA-256, UUID, conversor de cores HEX/RGB e timestamp offline |
 | GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG; favoritos e abertura da pasta de instalação |
 | Save Center | Cadastro manual de pastas, backups locais, histórico e restauração protegida |
@@ -79,7 +79,7 @@ Os comandos de terminal pertencem exclusivamente ao desenvolvimento, não à ins
 
 Use os modelos de issue para reportar bugs e sugerir funcionalidades. Leia também [Código de Conduta](CODE_OF_CONDUCT.md) e [Política de Segurança](SECURITY.md).
 
-## Próximos marcos
+Consulte [Sistema de plugins](docs/PLUGINS.md) para o contrato de extensões e os limites de segurança desta pré-alpha.\n\n## Próximos marcos
 
 1. Testes de restauração com falhas simuladas e validação física do Save Center.
 2. Validar o adaptador TOTK Recomp com instalação real e confirmar `TOTK_PROFILE_DIR`.
