@@ -302,10 +302,26 @@ function Toolbox() {
   const [copied, setCopied] = useState("");
   const [uuid, setUuid] = useState("");
   const [jsonMode, setJsonMode] = useState<"pretty" | "compact">("pretty");
+  const [colorInput, setColorInput] = useState("#9A75ED");
+  const [colorOutput, setColorOutput] = useState("");
+  const [colorError, setColorError] = useState("");
+  const [timestampInput, setTimestampInput] = useState("");
+  const [timestampOutput, setTimestampOutput] = useState("");
+  const [timestampError, setTimestampError] = useState("");
+  const copyTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+  }, []);
+
 
   const copy = async (value: string, key: string) => {
-    try { await navigator.clipboard.writeText(value); setCopied(key); window.setTimeout(() => setCopied(""), 1600); }
-    catch { setCopied("error"); }
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(key);
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+      copyTimer.current = window.setTimeout(() => { setCopied(""); copyTimer.current = null; }, 1600);
+    } catch { setCopied("error"); }
   };
   const transform = (value: string) => setTextValue(value);
   const formatJson = () => {
@@ -337,6 +353,33 @@ function Toolbox() {
       const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hashInput));
       setHashOutput(Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join(""));
     } catch (e) { setHashError(e instanceof Error ? e.message : "Falha ao calcular SHA-256."); }
+  };
+
+  const convertColor = () => {
+    const value = colorInput.trim().replace(/^#/, "");
+    if (!/^(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) {
+      setColorOutput("");
+      setColorError("Informe uma cor HEX válida, como #9A75ED ou #ABC.");
+      return;
+    }
+    const hex = value.length === 3 ? value.split("").map(char => char + char).join("") : value;
+    const channels = [0, 2, 4].map(index => parseInt(hex.slice(index, index + 2), 16));
+    setColorOutput(`RGB(${channels.join(", ")}) • ` + channels.map(channel => channel.toString().padStart(3, " ")).join(" / "));
+    setColorError("");
+  };
+  const convertTimestamp = () => {
+    const raw = timestampInput.trim();
+    if (!raw) { setTimestampOutput(""); setTimestampError("Informe um timestamp ou uma data ISO."); return; }
+    const numeric = /^-?\\d+(?:\\.\\d+)?$/.test(raw) ? Number(raw) : NaN;
+    const milliseconds = Number.isFinite(numeric) ? (Math.abs(numeric) < 1e12 ? numeric * 1000 : numeric) : Date.parse(raw);
+    const date = new Date(milliseconds);
+    if (!Number.isFinite(milliseconds) || Number.isNaN(date.getTime())) {
+      setTimestampOutput("");
+      setTimestampError("Data inválida. Use segundos, milissegundos ou uma data ISO 8601.");
+      return;
+    }
+    setTimestampOutput(`ISO 8601: ${date.toISOString()}\\nLocal: ${date.toLocaleString("pt-BR")}\\nUnix (s): ${Math.floor(date.getTime() / 1000)}\\nUnix (ms): ${date.getTime()}`);
+    setTimestampError("");
   };
   const words = textValue.trim() ? textValue.trim().split(/\\s+/).length : 0;
   const copyLabel = (key: string) => copied === key ? <><Check size={14}/> Copiado</> : <><Copy size={14}/> Copiar</>;
@@ -393,6 +436,21 @@ function Toolbox() {
         <p>Gere identificadores UUID v4 aleatórios usando o gerador criptográfico do navegador.</p>
         <div className="tool-actions"><button className="primary-button compact" onClick={() => setUuid(crypto.randomUUID())}>Gerar UUID</button>{uuid && <button onClick={() => void copy(uuid,"uuid")}>{copyLabel("uuid")}</button>}</div>
         {uuid && <div className="json-output"><pre>{uuid}</pre></div>}
+      </article>
+
+      <article className="tool-card">
+        <div className="tool-card-heading"><div><span className="tool-kicker">07 / DESIGN</span><h3>Conversor de cores HEX</h3></div><Sparkles size={18}/></div>
+        <label className="tool-field-label">Cor hexadecimal<input value={colorInput} onChange={e => setColorInput(e.target.value)} placeholder="#9A75ED" maxLength={7}/></label>
+        <div className="tool-actions"><button className="primary-button compact" onClick={convertColor}>Converter para RGB</button><button onClick={() => {setColorInput("");setColorOutput("");setColorError("");}}>Limpar</button></div>
+        {colorError && <div className="tool-error">{colorError}</div>}
+        {colorOutput && <div className="json-output"><div><span>RESULTADO</span><button onClick={() => void copy(colorOutput.split(" • ")[0],"color")}>{copyLabel("color")}</button></div><pre>{colorOutput}</pre><div style={{height:24,borderRadius:6,background:colorInput, border:"1px solid #ffffff33"}}/></div>}
+      </article>
+      <article className="tool-card">
+        <div className="tool-card-heading"><div><span className="tool-kicker">08 / DATA E HORA</span><h3>Conversor de timestamp</h3></div><Clock3 size={18}/></div>
+        <textarea value={timestampInput} onChange={e => setTimestampInput(e.target.value)} placeholder="Unix em segundos/milissegundos ou data ISO 8601..." rows={3}/>
+        <div className="tool-actions"><button className="primary-button compact" onClick={convertTimestamp} disabled={!timestampInput.trim()}>Converter data</button><button onClick={() => {setTimestampInput("");setTimestampOutput("");setTimestampError("");}}>Limpar</button></div>
+        {timestampError && <div className="tool-error">{timestampError}</div>}
+        {timestampOutput && <div className="json-output"><div><span>RESULTADO</span><button onClick={() => void copy(timestampOutput,"timestamp")}>{copyLabel("timestamp")}</button></div><pre>{timestampOutput}</pre></div>}
       </article>
     </div>
     {copied === "error" && <div className="tool-error">A área de transferência não está disponível neste ambiente.</div>}
