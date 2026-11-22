@@ -287,6 +287,63 @@ pub async fn list_save_backups(app: AppHandle, game_id: Option<String>) -> Resul
         .map_err(|_| "Falha ao carregar o histórico de backups.".to_string())?
 }
 
+fn resolve_backup(app: &AppHandle, backup_id: &str, game_id: &str) -> Result<(SaveGame, SaveBackup, PathBuf), String> {
+    if !safe_id(game_id) || !safe_id(backup_id) {
+        return Err("Identificador de jogo ou backup inválido.".into());
+    }
+    let game = find_game(&read_games(app)?, game_id)?;
+    let backup = list_backups_impl(app, Some(game_id.to_string()))?
+        .into_iter()
+        .find(|item| item.id == backup_id)
+        .ok_or_else(|| "Backup não encontrado para este jogo.".to_string())?;
+    let folder = backup_root(app)?.join(&game.id).join(&backup.id);
+    let metadata = fs::symlink_metadata(&folder)
+        .map_err(|_| "A pasta deste backup não está disponível.".to_string())?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err("O local do backup não é uma pasta segura.".into());
+    }
+    Ok((game, backup, folder))
+}
+
+#[tauri::command]
+pub async fn export_save_backup(app: AppHandle, backup_id: String, game_id: String, destination_folder: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = crate::totk_recomp::operation_lock()?;
+        let (_game, backup, folder) = resolve_backup(&app, &backup_id, &game_id)?;
+        let payload = folder.join("payload");
+        verify_payload(&payload, backup.size_bytes, backup.file_count, &backup.file_hashes)?;
+        let parent = PathBuf::from(destination_folder).canonicalize()
+            .map_err(|_| "A pasta escolhida para exportação não está disponível.".to_string())?;
+        if !parent.is_dir() { return Err("O destino da exportação não é uma pasta.".into()); }
+        let destination = parent.join(format!("DIAMANDIS-ONE-backup-{}", backup.id));
+        if destination.exists() {
+            return Err("Já existe uma exportação com este identificador. Escolha outra pasta; nada foi sobrescrito.".into());
+        }
+        let mut stats = (0u64, 0u64);
+        copy_tree(&payload, &destination.join("payload"), &mut stats)
+            .map_err(|e| { let _ = fs::remove_dir_all(&destination); format!("A exportação falhou e foi revertida: {e}") })?;
+        let manifest = match serde_json::to_vec_pretty(&backup) {
+            Ok(value) => value,
+            Err(_) => { let _ = fs::remove_dir_all(&destination); return Err("Não foi possível preparar o manifesto da exportação.".into()); }
+        };
+        if let Err(error) = fs::write(destination.join("backup.json"), manifest) {
+            let _ = fs::remove_dir_all(&destination);
+            return Err(format!("Não foi possível finalizar a exportação: {error}"));
+        }
+        Ok(destination.to_string_lossy().into_owned())
+    }).await.map_err(|_| "Falha ao exportar backup em segundo plano.".to_string())?
+}
+
+#[tauri::command]
+pub async fn delete_save_backup(app: AppHandle, backup_id: String, game_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = crate::totk_recomp::operation_lock()?;
+        let (_game, _backup, folder) = resolve_backup(&app, &backup_id, &game_id)?;
+        fs::remove_dir_all(&folder)
+            .map_err(|_| "Não foi possível remover este backup. Os arquivos originais do jogo não foram alterados.".to_string())
+    }).await.map_err(|_| "Falha ao remover backup em segundo plano.".to_string())?
+}
+
 fn verify_payload(
     payload: &Path,
     expected_size: u64,
