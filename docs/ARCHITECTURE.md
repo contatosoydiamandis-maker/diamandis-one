@@ -50,13 +50,13 @@ A listagem é executada fora da thread principal, com paginação, filtros e ord
 
 ### GameHub
 
-Steam, Epic Games e GOG são descobertos por leitura de manifests e diretórios conhecidos. A varredura não inicia launchers nem altera instalações. Requisições simultâneas de descoberta são compartilhadas no frontend e o resultado recente é mantido em cache curto. Favoritos e executáveis selecionados são armazenados localmente no WebView. A inicialização exige que a pessoa selecione o .exe; o backend canonicaliza ambos os caminhos, exige que o executável seja um arquivo .exe dentro da pasta do jogo e inicia o processo diretamente, sem shell intermediário.
+Steam, Epic Games e GOG são descobertos por leitura de manifests e diretórios conhecidos. A varredura não inicia launchers nem altera instalações. Requisições simultâneas de descoberta são compartilhadas no frontend e o resultado recente é mantido em cache curto. Favoritos e executáveis selecionados são armazenados localmente no WebView. A inicialização exige que a pessoa selecione o .exe; o backend canonicaliza ambos os caminhos, exige que o executável seja um arquivo .exe dentro da pasta do jogo e inicia o processo diretamente, sem shell intermediário. O caminho escolhido é lembrado localmente por instalação; se o arquivo for movido, a validação falha e a pessoa pode selecionar outro executável.
 
 ### Save Center
 
 O catálogo fica em `app_local_data_dir/save-center/games.json`; backups ficam em `app_local_data_dir/save-center/backups/<game-id>/<backup-id>`. A criação copia arquivos, recusa links simbólicos e gera SHA-256 por arquivo. A verificação confere estrutura, tamanho, contagem e hashes; backups legados sem manifesto recebem verificação estrutural identificada como tal. A restauração prepara e verifica um payload temporário e preserva o save atual antes da troca. O usuário pode exportar um backup verificado para uma pasta escolhida, com manifesto e payload independentes, ou excluir uma cópia específica após confirmação; nenhuma dessas ações altera a pasta original do jogo.
 
-### Adaptador Zelda: TOTK Recomp
+### Toolbox\n\nO módulo executa operações no WebView local: transformação de texto, JSON, Base64 UTF-8, codificação de URL, SHA-256, UUID v4, conversão HEX/RGB e timestamp/ISO 8601. Os campos de conversão validam entrada antes de produzir resultado. Timers de feedback da área de transferência são cancelados ao desmontar o módulo.\n\n### Adaptador Zelda: TOTK Recomp
 
 A instalação é identificada por `totk.exe`. Importação copia o perfil para uma campanha gerenciada, sem modificar a origem. A inicialização exige backup preventivo e define `TOTK_PROFILE_DIR`. Compatibilidade dessa variável precisa ser confirmada com uma build real do Recomp.
 
