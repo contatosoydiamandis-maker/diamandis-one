@@ -62,7 +62,7 @@ jobs:
       - name: Prepare desktop assets
         run: npm run prepare:assets
       - name: Run native core tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path src-tauri/Cargo.toml --all-targets
       - name: Upload generated Cargo lockfile
         if: always()
         uses: actions/upload-artifact@v4
