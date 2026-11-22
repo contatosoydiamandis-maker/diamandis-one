@@ -50,7 +50,7 @@ A listagem é executada fora da thread principal, com paginação, filtros e ord
 
 ### GameHub
 
-Steam, Epic Games e GOG são descobertos por leitura de manifests e diretórios conhecidos. A varredura não inicia launchers nem altera instalações. Requisições simultâneas de descoberta são compartilhadas no frontend e o resultado recente é mantido em cache curto. Favoritos são locais ao perfil do navegador/WebView.
+Steam, Epic Games e GOG são descobertos por leitura de manifests e diretórios conhecidos. A varredura não inicia launchers nem altera instalações. Requisições simultâneas de descoberta são compartilhadas no frontend e o resultado recente é mantido em cache curto. Favoritos e executáveis selecionados são armazenados localmente no WebView. A inicialização exige que a pessoa selecione o .exe; o backend canonicaliza ambos os caminhos, exige que o executável seja um arquivo .exe dentro da pasta do jogo e inicia o processo diretamente, sem shell intermediário.
 
 ### Save Center
 
