@@ -54,7 +54,7 @@ Steam, Epic Games e GOG são descobertos por leitura de manifests e diretórios 
 
 ### Save Center
 
-O catálogo fica em `app_local_data_dir/save-center/games.json`; backups ficam em `app_local_data_dir/save-center/backups/<game-id>/<backup-id>`. A criação copia arquivos, recusa links simbólicos e gera SHA-256 por arquivo. A verificação confere estrutura, tamanho, contagem e hashes; backups legados sem manifesto recebem verificação estrutural identificada como tal. A restauração prepara e verifica um payload temporário e preserva o save atual antes da troca.
+O catálogo fica em `app_local_data_dir/save-center/games.json`; backups ficam em `app_local_data_dir/save-center/backups/<game-id>/<backup-id>`. A criação copia arquivos, recusa links simbólicos e gera SHA-256 por arquivo. A verificação confere estrutura, tamanho, contagem e hashes; backups legados sem manifesto recebem verificação estrutural identificada como tal. A restauração prepara e verifica um payload temporário e preserva o save atual antes da troca. O usuário pode exportar um backup verificado para uma pasta escolhida, com manifesto e payload independentes, ou excluir uma cópia específica após confirmação; nenhuma dessas ações altera a pasta original do jogo.
 
 ### Adaptador Zelda: TOTK Recomp
 
