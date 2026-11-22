@@ -25,7 +25,7 @@
 | Dashboard e identidade visual | Monitoramento nativo de CPU, RAM e unidades fixas/removíveis montadas no Windows; identidade visual e diagnóstico do core |
 | File Manager | Navegação entre unidades, filtro, criação, renomeação, cópia de arquivos e pastas, movimentação entre volumes com proteção contra perda e Lixeira |
 | Configurações | Tema escuro/claro/sistema e preferências persistentes |
-| Toolbox | Transformador de texto, JSON, Base64, URL, SHA-256 e UUID offline |
+| Toolbox | Texto, JSON, Base64, URL, SHA-256, UUID, conversor de cores HEX/RGB e timestamp offline |
 | GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG; favoritos e abertura da pasta de instalação |
 | Save Center | Cadastro manual de pastas, backups locais, histórico e restauração protegida |
 | Seleção de pastas | Diálogo nativo do Windows via Tauri |
