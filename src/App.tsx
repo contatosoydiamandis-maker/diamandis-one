@@ -172,9 +172,11 @@ function FileManager() {
   const [preferences, setPreferences] = useState<Preferences>({theme:"dark",defaultFolder:"",confirmBeforeDelete:true,openLastFolder:false,lastFolder:""});
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const preferencesRef = useRef(preferences);
+  const loadSequenceRef = useRef(0);
   useEffect(() => { preferencesRef.current = preferences; }, [preferences]);
 
   const load = useCallback(async (target?: string, requestedPage = 0) => {
+    const sequence = ++loadSequenceRef.current;
     setBusy(true); setError(""); setSelected(null);
     try {
       const data = await invoke<Listing>("list_directory", {
@@ -185,6 +187,7 @@ function FileManager() {
         kind: kindFilter,
         sort: sortBy
       });
+      if (sequence !== loadSequenceRef.current) return;
       setListing(data); setPath(data.path); setPage(requestedPage);
       if (preferencesRef.current.openLastFolder && preferencesRef.current.lastFolder !== data.path) {
         const next = { ...preferencesRef.current, lastFolder: data.path };
@@ -192,8 +195,11 @@ function FileManager() {
         setPreferences(next);
         void invoke("save_settings", { settings: next }).catch(() => {});
       }
-    } catch (e) { setError(String(e)); }
-    finally { setBusy(false); }
+    } catch (e) {
+      if (sequence === loadSequenceRef.current) setError(String(e));
+    } finally {
+      if (sequence === loadSequenceRef.current) setBusy(false);
+    }
   }, [filter, kindFilter, sortBy]);
 
   useEffect(() => {
@@ -209,7 +215,7 @@ function FileManager() {
       setSettingsLoaded(true);
       void load(initial || undefined);
     }).catch(() => { if (active) { setSettingsLoaded(true); void load(); } });
-    return () => { active = false; };
+    return () => { active = false; loadSequenceRef.current += 1; };
   }, []);
 
   useEffect(() => {
