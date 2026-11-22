@@ -138,6 +138,31 @@ mod tests {
     }
 
     #[test]
+    fn accepts_only_executables_inside_the_selected_game_folder() {
+        let root = std::env::temp_dir().join(format!(
+            "diamandis-gamehub-launch-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let game = root.join("Game");
+        fs::create_dir_all(&game).unwrap();
+        let executable = game.join("game.exe");
+        fs::write(&executable, b"test").unwrap();
+        let (resolved_folder, resolved_executable) = super::resolve_game_executable(
+            game.to_str().unwrap(),
+            executable.to_str().unwrap()
+        ).unwrap();
+        assert_eq!(resolved_folder, game.canonicalize().unwrap());
+        assert_eq!(resolved_executable, executable.canonicalize().unwrap());
+        let outside = root.join("outside.exe");
+        fs::write(&outside, b"test").unwrap();
+        assert!(super::resolve_game_executable(game.to_str().unwrap(), outside.to_str().unwrap()).is_err());
+        let non_executable = game.join("readme.txt");
+        fs::write(&non_executable, b"test").unwrap();
+        assert!(super::resolve_game_executable(game.to_str().unwrap(), non_executable.to_str().unwrap()).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn rejects_a_missing_installation_folder() {
         let missing = std::env::temp_dir().join(format!(
             "diamandis-gamehub-missing-{}",
@@ -156,6 +181,44 @@ fn resolve_game_folder(path: &str) -> Result<PathBuf, String> {
         return Err("O caminho do jogo não aponta para uma pasta.".into());
     }
     Ok(canonical)
+}
+
+
+fn resolve_game_executable(folder_path: &str, executable_path: &str) -> Result<(PathBuf, PathBuf), String> {
+    let folder = PathBuf::from(folder_path).canonicalize()
+        .map_err(|_| "A pasta de instalação não existe ou não pode ser acessada.".to_string())?;
+    if !folder.is_dir() {
+        return Err("O caminho do jogo não aponta para uma pasta.".into());
+    }
+    let executable = PathBuf::from(executable_path).canonicalize()
+        .map_err(|_| "O executável selecionado não existe ou não pode ser acessado.".to_string())?;
+    if !executable.is_file() || !executable.starts_with(&folder) {
+        return Err("Por segurança, selecione um executável que esteja dentro da pasta deste jogo.".into());
+    }
+    if !executable.extension().and_then(|value| value.to_str()).is_some_and(|value| value.eq_ignore_ascii_case("exe")) {
+        return Err("O GameHub só inicia arquivos executáveis .exe no Windows.".into());
+    }
+    Ok((folder, executable))
+}
+
+#[tauri::command]
+pub async fn launch_game(game_folder_path: String, executable_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (folder, executable) = resolve_game_executable(&game_folder_path, &executable_path)?;
+        #[cfg(target_os = "windows")]
+        {
+            Command::new(&executable)
+                .current_dir(&folder)
+                .spawn()
+                .map_err(|_| "O Windows não conseguiu iniciar este jogo. Verifique se o executável ainda existe.".to_string())?;
+            Ok(())
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = (folder, executable);
+            Err("A inicialização direta de jogos está disponível inicialmente no Windows.".into())
+        }
+    }).await.map_err(|_| "Não foi possível iniciar o jogo em segundo plano.".to_string())?
 }
 
 #[tauri::command]
