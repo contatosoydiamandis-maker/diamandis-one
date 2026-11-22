@@ -309,7 +309,7 @@ fn resolve_backup(app: &AppHandle, backup_id: &str, game_id: &str) -> Result<(Sa
 pub async fn export_save_backup(app: AppHandle, backup_id: String, game_id: String, destination_folder: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = crate::totk_recomp::operation_lock()?;
-        let (_game, backup, folder) = resolve_backup(&app, &backup_id, &game_id)?;
+        let (_game, mut backup, folder) = resolve_backup(&app, &backup_id, &game_id)?;
         let payload = folder.join("payload");
         verify_payload(&payload, backup.size_bytes, backup.file_count, &backup.file_hashes)?;
         let parent = PathBuf::from(destination_folder).canonicalize()
@@ -319,6 +319,7 @@ pub async fn export_save_backup(app: AppHandle, backup_id: String, game_id: Stri
         if destination.exists() {
             return Err("Já existe uma exportação com este identificador. Escolha outra pasta; nada foi sobrescrito.".into());
         }
+        backup.backup_path = destination.to_string_lossy().into_owned();
         let mut stats = (0u64, 0u64);
         copy_tree(&payload, &destination.join("payload"), &mut stats)
             .map_err(|e| { let _ = fs::remove_dir_all(&destination); format!("A exportação falhou e foi revertida: {e}") })?;
