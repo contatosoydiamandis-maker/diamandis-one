@@ -9,6 +9,7 @@ type SourceFilter = "Todos" | "Xbox" | "Hydra" | "Steam" | "Epic Games" | "GOG" 
 let cachedGames: Game[] | null = null;
 let cachedAt = 0;
 let scanPromise: Promise<Game[]> | null = null;
+let scanPromiseKey = "";
 
 const readFavorites = (): string[] => {
   try {
@@ -46,6 +47,7 @@ export default function GameHub() {
     catch { return {}; }
   });
   const copyTimer = useRef<number | null>(null);
+  const scanVersion = useRef(0);
 
   useEffect(() => () => {
     if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
@@ -56,20 +58,29 @@ export default function GameHub() {
       setGames([...cachedGames, ...manualGames]);
       return;
     }
+    const requestVersion = ++scanVersion.current;
     setLoading(true);
     setError("");
-    const request = scanPromise ?? invoke<Game[]>("scan_games", { customRoots: libraryRoots });
+    const requestKey = JSON.stringify(libraryRoots.map(root => ({ path: root.path.toLowerCase(), source: root.source })));
+    const request = scanPromise && scanPromiseKey === requestKey
+      ? scanPromise
+      : invoke<Game[]>("scan_games", { customRoots: libraryRoots });
     scanPromise = request;
+    scanPromiseKey = requestKey;
     try {
       const result = await request;
+      if (requestVersion !== scanVersion.current) return;
       cachedGames = result;
       cachedAt = Date.now();
       setGames([...result, ...manualGames]);
     } catch (e) {
-      setError(String(e));
+      if (requestVersion === scanVersion.current) setError(String(e));
     } finally {
-      if (scanPromise === request) scanPromise = null;
-      setLoading(false);
+      if (scanPromise === request) {
+        scanPromise = null;
+        scanPromiseKey = "";
+      }
+      if (requestVersion === scanVersion.current) setLoading(false);
     }
   }, [libraryRoots, manualGames]);
 
