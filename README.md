@@ -23,7 +23,7 @@
 | Área | Estado |
 |---|---|
 | Dashboard e identidade visual | Monitoramento nativo de CPU, RAM e unidades fixas/removíveis montadas no Windows; identidade visual e diagnóstico do core |
-| File Manager | Navegação entre unidades, filtro, criação, renomeação, cópia de arquivos e pastas, movimentação entre volumes com proteção contra perda e Lixeira |
+| File Manager | Navegação entre unidades, filtro, criação, renomeação, cópia de arquivos e pastas, movimentação entre volumes com verificação SHA-256/estrutura antes de remover a origem e Lixeira |
 | Configurações | Tema escuro/claro/sistema, preferências persistentes e validador de manifesto de plugins API v1 |
 | Toolbox | Texto, JSON, Base64, URL, SHA-256, UUID, conversor de cores HEX/RGB e timestamp offline |
 | GameHub | Descoberta somente leitura de Steam, Epic, GOG e XboxGames acessíveis; bibliotecas Hydra/Outros configuráveis, cadastro manual, favoritos e inicialização de executáveis validados |
