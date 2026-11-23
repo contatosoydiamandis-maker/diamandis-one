@@ -1,4 +1,5 @@
-use std::{fs, io, path::{Component, Path, PathBuf}};
+use sha2::{Digest, Sha256};
+use std::{collections::BTreeMap, fs, io::{self, Read}, path::{Component, Path, PathBuf}};
 
 pub fn validate_name(name: &str) -> Result<&str, String> {
     let clean = name.trim();
@@ -129,6 +130,55 @@ fn copy_directory_new(source: &Path, destination: &Path) -> io::Result<()> {
     result
 }
 
+fn fingerprint_file(path: &Path) -> io::Result<String> {
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 { break; }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+// Captures names, empty directories, file sizes and SHA-256 hashes. A move
+// across volumes is only allowed to delete its source after this matches.
+fn fingerprint_tree(root: &Path) -> io::Result<BTreeMap<String, String>> {
+    fn visit(root: &Path, current: &Path, entries: &mut BTreeMap<String, String>) -> io::Result<()> {
+        for item in fs::read_dir(current)? {
+            let item = item?;
+            let path = item.path();
+            let kind = item.file_type()?;
+            let relative = path.strip_prefix(root)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "path escaped root"))?
+                .to_string_lossy().replace('\\', "/");
+            if kind.is_symlink() {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "symbolic links cannot be verified for a move"));
+            }
+            if kind.is_dir() {
+                entries.insert(relative.clone(), "directory".into());
+                visit(root, &path, entries)?;
+            } else if kind.is_file() {
+                let size = item.metadata()?.len();
+                let hash = fingerprint_file(&path)?;
+                entries.insert(relative, format!("file:{size}:{hash}"));
+            } else {
+                return Err(io::Error::new(io::ErrorKind::Unsupported, "unsupported filesystem entry"));
+            }
+        }
+        Ok(())
+    }
+
+    let metadata = fs::symlink_metadata(root)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "move root is not a safe directory"));
+    }
+    let mut entries = BTreeMap::new();
+    visit(root, root, &mut entries)?;
+    Ok(entries)
+}
+
 fn is_cross_device_error(error: &io::Error) -> bool {
     #[cfg(windows)]
     { error.raw_os_error() == Some(17) }
@@ -174,9 +224,29 @@ fn move_item_impl(path: String, destination_folder_path: String) -> Result<(), S
             } else {
                 return Err("Este tipo de item não pode ser movido entre unidades.".into());
             };
-            copy_result.map_err(|_| "A cópia entre unidades falhou. A origem foi preservada e qualquer cópia incompleta foi removida.".to_string())?;
+            if let Err(error) = copy_result {
+                return Err(format!("A cópia entre unidades falhou: {error}. A origem foi preservada e qualquer cópia incompleta foi removida."));
+            }
+
+            // Verify the copied bytes and directory structure before deleting
+            // anything. If the source changed while copying, keep both copies.
+            let verified = if source.is_dir() {
+                match (fingerprint_tree(&source), fingerprint_tree(&destination)) {
+                    (Ok(original), Ok(copied)) => original == copied,
+                    _ => false,
+                }
+            } else {
+                match (fingerprint_file(&source), fingerprint_file(&destination)) {
+                    (Ok(original), Ok(copied)) => original == copied,
+                    _ => false,
+                }
+            };
+            if !verified {
+                return Err("A cópia foi criada, mas a verificação SHA-256/estrutura não confirmou que ela corresponde à origem. Os dois locais foram preservados; confira os arquivos antes de tentar novamente.".into());
+            }
+
             remove_moved_source(&source).map_err(|_| {
-                "A cópia foi concluída, mas o Windows não permitiu remover a origem. Os arquivos foram preservados nos dois locais; confira antes de apagar qualquer cópia.".to_string()
+                "A cópia foi verificada, mas o Windows não permitiu remover a origem. Os arquivos foram preservados nos dois locais; confira antes de apagar qualquer cópia.".to_string()
             })
         }
         Err(_) => Err("Não foi possível mover o item. Verifique permissões, espaço disponível e se o item está em uso.".into()),
@@ -200,7 +270,7 @@ fn delete_item_impl(path: String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{copy_directory_new, copy_file_impl, copy_file_new, move_item_impl, validate_name};
+    use super::{copy_directory_new, copy_file_impl, copy_file_new, fingerprint_tree, move_item_impl, validate_name};
     use std::{fs, time::{SystemTime, UNIX_EPOCH}};
 
     fn temp_root(label: &str) -> std::path::PathBuf {
@@ -210,6 +280,23 @@ mod tests {
         ));
         fs::create_dir_all(&root).unwrap();
         root
+    }
+
+    #[test]
+    fn tree_fingerprint_detects_content_and_empty_directory_changes() {
+        let root = temp_root("fingerprint");
+        let source = root.join("source");
+        let copy = root.join("copy");
+        fs::create_dir_all(source.join("empty")).unwrap();
+        fs::write(source.join("save.dat"), b"original").unwrap();
+        copy_directory_new(&source, &copy).unwrap();
+
+        assert_eq!(fingerprint_tree(&source).unwrap(), fingerprint_tree(&copy).unwrap());
+        fs::write(copy.join("save.dat"), b"modified").unwrap();
+        assert_ne!(fingerprint_tree(&source).unwrap(), fingerprint_tree(&copy).unwrap());
+        fs::remove_dir_all(copy.join("empty")).unwrap();
+        assert_ne!(fingerprint_tree(&source).unwrap(), fingerprint_tree(&copy).unwrap());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
