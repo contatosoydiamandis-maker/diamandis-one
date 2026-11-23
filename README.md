@@ -79,7 +79,11 @@ Os comandos de terminal pertencem exclusivamente ao desenvolvimento, não à ins
 
 Use os modelos de issue para reportar bugs e sugerir funcionalidades. Leia também [Código de Conduta](CODE_OF_CONDUCT.md) e [Política de Segurança](SECURITY.md).
 
-Consulte [Sistema de plugins](docs/PLUGINS.md) para o contrato de extensões e os limites de segurança desta pré-alpha.\n\nO GameHub não varre a pasta protegida WindowsApps nem altera permissões. Alguns jogos Xbox empacotados exigem ativação pelo Windows e ainda precisam de um adaptador específico.\n\n## Próximos marcos
+Consulte [Sistema de plugins](docs/PLUGINS.md) para o contrato de extensões e os limites de segurança desta pré-alpha.
+
+O GameHub não varre a pasta protegida WindowsApps nem altera permissões. Alguns jogos Xbox empacotados exigem ativação pelo Windows e ainda precisam de um adaptador específico.
+
+## Próximos marcos
 
 1. Testes de restauração com falhas simuladas e validação física do Save Center.
 2. Validar o adaptador TOTK Recomp com instalação real e confirmar `TOTK_PROFILE_DIR`.
