@@ -8,8 +8,18 @@ type LibraryRoot = { path: string; source: "Hydra" | "Outros" };
 type SourceFilter = "Todos" | "Xbox" | "Hydra" | "Steam" | "Epic Games" | "GOG" | "Outros" | "Manual";
 let cachedGames: Game[] | null = null;
 let cachedAt = 0;
+let cachedGamesKey = "";
 let scanPromise: Promise<Game[]> | null = null;
 let scanPromiseKey = "";
+
+const normalizeWindowsPath = (path: string) => path.replace(/\\/g, "/").replace(/\\/+$/, "").toLocaleLowerCase();
+
+const mergeGames = (scanned: Game[], manual: Game[]): Game[] => {
+  const merged = new Map<string, Game>();
+  for (const game of scanned) merged.set(normalizeWindowsPath(game.path), game);
+  for (const game of manual) merged.set(normalizeWindowsPath(game.path), game);
+  return [...merged.values()];
+};
 
 const readFavorites = (): string[] => {
   try {
@@ -54,14 +64,14 @@ export default function GameHub() {
   }, []);
 
   const scan = useCallback(async (force = false) => {
-    if (!force && cachedGames && Date.now() - cachedAt < 45_000) {
-      setGames([...cachedGames, ...manualGames]);
+    const requestKey = JSON.stringify(libraryRoots.map(root => ({ path: normalizeWindowsPath(root.path), source: root.source })));
+    if (!force && cachedGames && cachedGamesKey === requestKey && Date.now() - cachedAt < 45_000) {
+      setGames(mergeGames(cachedGames, manualGames));
       return;
     }
     const requestVersion = ++scanVersion.current;
     setLoading(true);
     setError("");
-    const requestKey = JSON.stringify(libraryRoots.map(root => ({ path: root.path.toLowerCase(), source: root.source })));
     const request = scanPromise && scanPromiseKey === requestKey
       ? scanPromise
       : invoke<Game[]>("scan_games", { customRoots: libraryRoots });
@@ -71,8 +81,9 @@ export default function GameHub() {
       const result = await request;
       if (requestVersion !== scanVersion.current) return;
       cachedGames = result;
+      cachedGamesKey = requestKey;
       cachedAt = Date.now();
-      setGames([...result, ...manualGames]);
+      setGames(mergeGames(result, manualGames));
     } catch (e) {
       if (requestVersion === scanVersion.current) setError(String(e));
     } finally {
@@ -205,7 +216,7 @@ export default function GameHub() {
       const name = folder.split(/[\\\\/]/).filter(Boolean).pop() || "Jogo manual";
       const next = [...manualGames.filter(game => game.path.toLowerCase() !== folder.toLowerCase()), { name, source: "Manual", path: folder, executable }];
       setManualGames(next);
-      setGames(current => [...current.filter(game => game.path.toLowerCase() !== folder.toLowerCase()), next[next.length - 1]]);
+      setGames(current => mergeGames(current, [next[next.length - 1]]));
       try { localStorage.setItem("diamandis.gamehub.manualGames", JSON.stringify(next)); }
       catch { setError("Jogo adicionado nesta sessão, mas não foi possível salvar a biblioteca manual."); }
     } catch (e) { setError(String(e)); }
