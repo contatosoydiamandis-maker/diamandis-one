@@ -1,5 +1,13 @@
 use serde::Serialize;
-use std::{collections::HashSet, env, fs, path::PathBuf, process::Command};
+use serde::Deserialize;
+use std::{collections::HashSet, env, fs, path::{Path, PathBuf}, process::Command};
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomLibraryRoot {
+    pub path: String,
+    pub source: String,
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -94,17 +102,68 @@ fn scan_gog(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>) {
 }
 
 #[tauri::command]
-pub async fn scan_games() -> Result<Vec<GameEntry>, String> {
-    tauri::async_runtime::spawn_blocking(scan_games_impl).await
+pub async fn scan_games(custom_roots: Option<Vec<CustomLibraryRoot>>) -> Result<Vec<GameEntry>, String> {
+    tauri::async_runtime::spawn_blocking(move || scan_games_impl(custom_roots.unwrap_or_default())).await
         .map_err(|_| "Não foi possível concluir a busca de jogos em segundo plano.".to_string())?
 }
 
-fn scan_games_impl() -> Result<Vec<GameEntry>, String> {
+fn directory_contains_executable(path: &Path, depth: usize) -> bool {
+    if depth > 4 { return false; }
+    let Ok(entries) = fs::read_dir(path) else { return false };
+    for entry in entries.flatten() {
+        let item_path = entry.path();
+        let Ok(kind) = entry.file_type() else { continue };
+        if kind.is_symlink() { continue; }
+        if kind.is_file() && item_path.extension().and_then(|v| v.to_str()).is_some_and(|v| v.eq_ignore_ascii_case("exe")) {
+            return true;
+        }
+        if kind.is_dir() && depth < 4 && directory_contains_executable(&item_path, depth + 1) {
+            return true;
+        }
+    }
+    false
+}
+
+fn scan_library_root(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>, root: &Path, source: &str) {
+    let Ok(root) = root.canonicalize() else { return };
+    if !root.is_dir() { return; }
+    let Ok(entries) = fs::read_dir(&root) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() { continue; }
+        if directory_contains_executable(&path, 0) {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            add_game(games, seen, name, source, path);
+        }
+    }
+}
+
+fn scan_xbox_games(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>) {
+    // O layout acessível do Xbox/GDK usa XboxGames na raiz do volume.
+    // WindowsApps permanece protegido e não é alterado nem tomado por posse.
+    for letter in b'A'..=b'Z' {
+        let root = PathBuf::from(format!("{}:\\XboxGames", letter as char));
+        if root.is_dir() {
+            scan_library_root(games, seen, &root, "Xbox");
+        }
+    }
+}
+
+fn scan_games_impl(custom_roots: Vec<CustomLibraryRoot>) -> Result<Vec<GameEntry>, String> {
     let mut games = Vec::new();
     let mut seen = HashSet::new();
     scan_steam(&mut games, &mut seen);
     scan_epic(&mut games, &mut seen);
     scan_gog(&mut games, &mut seen);
+    scan_xbox_games(&mut games, &mut seen);
+    for root in custom_roots.into_iter().take(32) {
+        let source = match root.source.as_str() {
+            "Hydra" => "Hydra",
+            "Xbox" => "Xbox",
+            _ => "Outros",
+        };
+        scan_library_root(&mut games, &mut seen, Path::new(&root.path), source);
+    }
     games.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     Ok(games)
 }
