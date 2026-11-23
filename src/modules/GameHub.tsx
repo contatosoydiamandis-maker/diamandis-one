@@ -71,7 +71,7 @@ export default function GameHub() {
       if (scanPromise === request) scanPromise = null;
       setLoading(false);
     }
-  }, []);
+  }, [libraryRoots, manualGames]);
 
   useEffect(() => { void scan(); }, [scan]);
 
@@ -167,7 +167,10 @@ export default function GameHub() {
       setLibraryRoots(next);
       try { localStorage.setItem("diamandis.gamehub.libraryRoots", JSON.stringify(next)); }
       catch { setError("Pasta adicionada nesta sessão, mas não foi possível salvar a preferência."); }
-      await scan(true);
+      const result = await invoke<Game[]>("scan_games", { customRoots: next });
+      cachedGames = result;
+      cachedAt = Date.now();
+      setGames([...result, ...manualGames]);
     } catch (e) { setError(String(e)); }
   };
 
@@ -178,6 +181,12 @@ export default function GameHub() {
       if (typeof folder !== "string") return;
       const executable = await open({ directory: false, multiple: false, defaultPath: folder, title: "Selecione o executável principal do jogo", filters: [{ name: "Executáveis Windows", extensions: ["exe"] }] });
       if (typeof executable !== "string") return;
+      const normalizedFolder = folder.replace(/[\\\\/]+$/, "").toLowerCase();
+      const normalizedExecutable = executable.toLowerCase();
+      if (!normalizedExecutable.startsWith(normalizedFolder + "\\\\")) {
+        setError("O executável precisa estar dentro da pasta selecionada para esse jogo.");
+        return;
+      }
       const name = folder.split(/[\\\\/]/).filter(Boolean).pop() || "Jogo manual";
       const next = [...manualGames.filter(game => game.path.toLowerCase() !== folder.toLowerCase()), { name, source: "Manual", path: folder, executable }];
       setManualGames(next);
