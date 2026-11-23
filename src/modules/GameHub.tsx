@@ -211,6 +211,7 @@ export default function GameHub() {
       <button className={source === "Steam" ? "platform-stat active" : "platform-stat"} onClick={() => setSource("Steam")}><span className="platform-mark steam">S</span><span><strong>{counts.steam}</strong><small>Steam</small></span></button>
       <button className={source === "Epic Games" ? "platform-stat active" : "platform-stat"} onClick={() => setSource("Epic Games")}><span className="platform-mark epic">E</span><span><strong>{counts.epic}</strong><small>Epic Games</small></span></button>
       <button className={source === "GOG" ? "platform-stat active" : "platform-stat"} onClick={() => setSource("GOG")}><span className="platform-mark gog">G</span><span><strong>{counts.gog}</strong><small>GOG</small></span></button>
+      <button className={source === "Outros" || source === "Manual" ? "platform-stat active" : "platform-stat"} onClick={() => setSource("Outros")}><span className="platform-mark other">+</span><span><strong>{counts.others}</strong><small>Outros / Manual</small></span></button>
     </div>
 
     <div className="gamehub-library-heading"><div><span className="tool-kicker">COLEÇÃO LOCAL</span><h3>Biblioteca de jogos</h3><p>Os jogos são detectados no computador. O GameHub não altera instalações.</p></div>
