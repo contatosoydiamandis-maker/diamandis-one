@@ -130,7 +130,9 @@ fn scan_library_root(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>, roo
     let Ok(entries) = fs::read_dir(&root) else { return };
     for entry in entries.flatten() {
         let path = entry.path();
-        if !path.is_dir() { continue; }
+        let Ok(kind) = entry.file_type() else { continue };
+        // Não seguir diretórios simbólicos ao varrer bibliotecas selecionadas.
+        if !kind.is_dir() || kind.is_symlink() { continue; }
         if directory_contains_executable(&path, 0) {
             let name = entry.file_name().to_string_lossy().into_owned();
             add_game(games, seen, name, source, path);
