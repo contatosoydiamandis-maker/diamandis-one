@@ -167,10 +167,6 @@ export default function GameHub() {
       setLibraryRoots(next);
       try { localStorage.setItem("diamandis.gamehub.libraryRoots", JSON.stringify(next)); }
       catch { setError("Pasta adicionada nesta sessão, mas não foi possível salvar a preferência."); }
-      const result = await invoke<Game[]>("scan_games", { customRoots: next });
-      cachedGames = result;
-      cachedAt = Date.now();
-      setGames([...result, ...manualGames]);
     } catch (e) { setError(String(e)); }
   };
 
@@ -231,7 +227,7 @@ export default function GameHub() {
       <button className="secondary-button" onClick={() => void addLibraryRoot("Outros")}><FolderOpen size={14}/> Adicionar outra biblioteca</button>
       <button className="primary-button compact" onClick={() => void addManualGame()}><Plus size={14}/> Adicionar jogo manual</button>
     </div>
-    {libraryRoots.length > 0 && <div className="gamehub-roots" aria-label="Bibliotecas adicionais">{libraryRoots.map(root => <span key={root.path}>{root.source}: {root.path}<button onClick={() => { const next = libraryRoots.filter(item => item.path !== root.path); setLibraryRoots(next); localStorage.setItem("diamandis.gamehub.libraryRoots", JSON.stringify(next)); void scan(true); }} aria-label={`Remover biblioteca ${root.path}`}>×</button></span>)}</div>}
+    {libraryRoots.length > 0 && <div className="gamehub-roots" aria-label="Bibliotecas adicionais">{libraryRoots.map(root => <span key={root.path}>{root.source}: {root.path}<button onClick={() => { const next = libraryRoots.filter(item => item.path !== root.path); setLibraryRoots(next); localStorage.setItem("diamandis.gamehub.libraryRoots", JSON.stringify(next)); }} aria-label={`Remover biblioteca ${root.path}`}>×</button></span>)}</div>}
     <div className="gamehub-controls">
       <label className="gamehub-search"><Search size={15}/><input aria-label="Buscar jogos por nome" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar por nome do jogo..."/></label>
       <button className={showFavorites ? "gamehub-favorites active" : "gamehub-favorites"} onClick={() => setShowFavorites(value => !value)}><Heart size={14} fill={showFavorites ? "currentColor" : "none"}/> Favoritos <span>{favorites.length}</span></button>
