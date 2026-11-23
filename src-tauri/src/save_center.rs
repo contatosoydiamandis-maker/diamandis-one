@@ -124,7 +124,9 @@ fn copy_tree(source: &Path, destination: &Path, stats: &mut (u64, u64)) -> io::R
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "links simbólicos não são aceitos"));
     }
     if metadata.is_dir() {
-        fs::create_dir_all(destination)?;
+        // The destination must be new. create_dir_all could merge into an
+        // existing folder and overwrite files after a path race.
+        fs::create_dir(destination)?;
         for entry in fs::read_dir(source)? {
             let entry = entry?;
             copy_tree(&entry.path(), &destination.join(entry.file_name()), stats)?;
@@ -320,6 +322,8 @@ pub async fn export_save_backup(app: AppHandle, backup_id: String, game_id: Stri
             return Err("Já existe uma exportação com este identificador. Escolha outra pasta; nada foi sobrescrito.".into());
         }
         backup.backup_path = destination.to_string_lossy().into_owned();
+        fs::create_dir(&destination)
+            .map_err(|_| "Não foi possível reservar uma pasta nova para a exportação. Nada foi sobrescrito.".to_string())?;
         let mut stats = (0u64, 0u64);
         copy_tree(&payload, &destination.join("payload"), &mut stats)
             .map_err(|e| { let _ = fs::remove_dir_all(&destination); format!("A exportação falhou e foi revertida: {e}") })?;
@@ -468,6 +472,22 @@ mod tests {
         copy_tree(&source, &target, &mut stats).unwrap();
         assert_eq!(fs::read(target.join("nested/save.dat")).unwrap(), b"save-data");
         assert_eq!(stats, (9, 1));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn refuses_to_merge_backup_into_an_existing_destination() {
+        let root = temp_root();
+        let source = root.join("source");
+        let destination = root.join("destination");
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        fs::write(source.join("save.dat"), b"new-save").unwrap();
+        fs::write(destination.join("save.dat"), b"keep-existing").unwrap();
+
+        let mut stats = (0, 0);
+        assert!(copy_tree(&source, &destination, &mut stats).is_err());
+        assert_eq!(fs::read(destination.join("save.dat")).unwrap(), b"keep-existing");
         fs::remove_dir_all(root).unwrap();
     }
 
