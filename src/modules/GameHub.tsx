@@ -12,7 +12,7 @@ let cachedGamesKey = "";
 let scanPromise: Promise<Game[]> | null = null;
 let scanPromiseKey = "";
 
-const normalizeWindowsPath = (path: string) => path.replace(/\\/g, "/").replace(/\\/+$/, "").toLocaleLowerCase();
+const normalizeWindowsPath = (path: string) => path.replace(/\\/g, "/").replace(/\/+$/, "").toLocaleLowerCase();
 
 const mergeGames = (scanned: Game[], manual: Game[]): Game[] => {
   const merged = new Map<string, Game>();
@@ -213,8 +213,8 @@ export default function GameHub() {
         setError("O executável precisa estar dentro da pasta selecionada para esse jogo.");
         return;
       }
-      const name = folder.replace(/\\\\/g, "/").split("/").filter(Boolean).pop() || "Jogo manual";
-      const next = [...manualGames.filter(game => game.path.toLowerCase() !== folder.toLowerCase()), { name, source: "Manual", path: folder, executable }];
+      const name = folder.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "Jogo manual";
+      const next = [...manualGames.filter(game => normalizeWindowsPath(game.path) !== normalizeWindowsPath(folder)), { name, source: "Manual", path: folder, executable }];
       setManualGames(next);
       setGames(current => mergeGames(current, [next[next.length - 1]]));
       try { localStorage.setItem("diamandis.gamehub.manualGames", JSON.stringify(next)); }
