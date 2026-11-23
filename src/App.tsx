@@ -175,6 +175,15 @@ function FileManager() {
   const loadSequenceRef = useRef(0);
   useEffect(() => { preferencesRef.current = preferences; }, [preferences]);
 
+  const refreshStorageDrives = useCallback(async () => {
+    try {
+      const metrics = await invoke<{ storageDrives: Drive[] }>("get_system_metrics");
+      setDrives(metrics.storageDrives ?? []);
+    } catch {
+      setDrives([]);
+    }
+  }, []);
+
   const load = useCallback(async (target?: string, requestedPage = 0) => {
     const sequence = ++loadSequenceRef.current;
     setBusy(true); setError(""); setSelected(null);
@@ -204,9 +213,7 @@ function FileManager() {
 
   useEffect(() => {
     let active = true;
-    void invoke<{ storageDrives: Drive[] }>("get_system_metrics")
-      .then(metrics => { if (active) setDrives(metrics.storageDrives ?? []); })
-      .catch(() => { if (active) setDrives([]); });
+    void refreshStorageDrives();
     invoke<Preferences>("load_settings").then(settings => {
       if (!active) return;
       setPreferences(settings);
@@ -260,7 +267,7 @@ function FileManager() {
     <div className="file-toolbar"><div className="file-toolbar-left">
       <button className="toolbar-button" disabled={!listing?.parent || busy} onClick={() => listing?.parent && void load(listing.parent)} title="Pasta anterior"><ArrowLeft size={16}/></button>
       <form className="path-form" onSubmit={e => {e.preventDefault(); void load(path);}}><HardDrive size={15}/><input aria-label="Caminho da pasta" value={path} onChange={e => setPath(e.target.value)} placeholder="Caminho da pasta..."/></form>
-      <button className="toolbar-button" disabled={busy} onClick={() => void load(path || undefined)} title="Atualizar"><RefreshCw size={15}/></button>
+      <button className="toolbar-button" disabled={busy} onClick={() => { void load(path || undefined); void refreshStorageDrives(); }} title="Atualizar pasta e unidades"><RefreshCw size={15}/></button>
       <select className="file-sort file-drive-select" aria-label="Trocar unidade de armazenamento" value={currentDrive} disabled={busy || drives.length === 0} onChange={e => { const drive = drives.find(item => item.letter === e.target.value); if (drive) void load(`${drive.letter}\\`); }}>
         <option value="">Unidades</option>
         {drives.map(drive => <option key={drive.letter} value={drive.letter}>{drive.name} ({drive.letter})</option>)}
