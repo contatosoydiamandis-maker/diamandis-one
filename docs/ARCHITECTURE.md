@@ -46,7 +46,7 @@ CPU é calculada por deltas de `GetSystemTimes`; RAM usa `GlobalMemoryStatusEx`;
 
 ### File Manager
 
-A listagem é executada fora da thread principal, com paginação, filtros e ordenação no backend. O seletor de unidades permite alternar entre volumes detectados. Operações de alteração validam nomes e caminhos, recusam links simbólicos e não sobrescrevem destinos. Movimentações no mesmo volume usam rename; entre volumes, o backend copia arquivos ou árvores de diretórios para um destino novo, sincroniza os arquivos e só então remove a origem. Se a cópia falhar, a origem permanece; se a remoção final falhar, ambas as cópias permanecem e a UI recebe um erro explícito. Links simbólicos e tipos especiais são recusados na cópia entre volumes. Exclusão usa a Lixeira do sistema.
+A listagem é executada fora da thread principal, com paginação, filtros e ordenação no backend. O seletor de unidades permite alternar entre volumes detectados. Operações de alteração validam nomes e caminhos, recusam links simbólicos e não sobrescrevem destinos. Movimentações no mesmo volume usam rename; entre volumes, o backend copia arquivos ou árvores de diretórios para um destino reservado exclusivamente, sincroniza os arquivos e compara SHA-256, tamanhos, nomes e estrutura (incluindo diretórios vazios) antes de remover a origem. Se a cópia falhar ou a verificação divergir, a origem permanece; se a remoção final falhar, ambas as cópias permanecem e a UI recebe um erro explícito. Links simbólicos e tipos especiais são recusados na cópia entre volumes. Exclusão usa a Lixeira do sistema.
 
 ### GameHub
 
@@ -54,7 +54,7 @@ Steam, Epic Games e GOG são descobertos por manifests e diretórios conhecidos.
 
 ### Save Center
 
-O catálogo fica em `app_local_data_dir/save-center/games.json`; backups ficam em `app_local_data_dir/save-center/backups/<game-id>/<backup-id>`. A criação copia arquivos, recusa links simbólicos e gera SHA-256 por arquivo. A verificação confere estrutura, tamanho, contagem e hashes; backups legados sem manifesto recebem verificação estrutural identificada como tal. A restauração prepara e verifica um payload temporário e preserva o save atual antes da troca. O usuário pode exportar um backup verificado para uma pasta escolhida, com manifesto e payload independentes, ou excluir uma cópia específica após confirmação; nenhuma dessas ações altera a pasta original do jogo.
+O catálogo fica em `app_local_data_dir/save-center/games.json`; backups ficam em `app_local_data_dir/save-center/backups/<game-id>/<backup-id>`. A criação copia arquivos para diretórios reservados exclusivamente, recusa links simbólicos e gera SHA-256 por arquivo. A verificação confere estrutura, tamanho, contagem e hashes; backups legados sem manifesto recebem verificação estrutural identificada como tal. A exportação também reserva uma pasta nova, sem mesclar arquivos com um destino preexistente. A restauração prepara e verifica um payload temporário e preserva o save atual antes da troca. O usuário pode exportar um backup verificado para uma pasta escolhida, com manifesto e payload independentes, ou excluir uma cópia específica após confirmação; nenhuma dessas ações altera a pasta original do jogo.
 
 ### Toolbox
 
