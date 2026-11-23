@@ -27,15 +27,16 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+      - name: Validate generated npm lockfile
+        run: test -s package-lock.json
       - name: Check frontend and build production bundle
         run: npm run check
       - name: Upload generated npm lockfile
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: npm-lockfile
           path: package-lock.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
 
   windows-validation:
@@ -63,13 +64,18 @@ jobs:
         run: npm run prepare:assets
       - name: Run native core tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --all-targets
+      - name: Validate generated Cargo lockfile
+        shell: pwsh
+        run: |
+          if (!(Test-Path "src-tauri/Cargo.lock") -or (Get-Item "src-tauri/Cargo.lock").Length -eq 0) {
+            throw "Cargo.lock não foi gerado. A validação não pode continuar."
+          }
       - name: Upload generated Cargo lockfile
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cargo-lockfile
           path: src-tauri/Cargo.lock
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
       - name: Build desktop app and NSIS installer
         run: npm run tauri build
