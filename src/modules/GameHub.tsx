@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Copy, FolderOpen, Gamepad2, Heart, LoaderCircle, Play, Plus, RefreshCw, Search, Settings2, ShieldCheck, Sparkles } from "lucide-react";
+import { Copy, FolderOpen, Gamepad2, Heart, LoaderCircle, Play, Plus, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -77,7 +77,7 @@ export default function GameHub() {
 
   const filtered = useMemo(() => games.filter(game => {
     const matchesQuery = game.name.toLocaleLowerCase().includes(query.toLocaleLowerCase());
-    const matchesSource = source === "Todos" || game.source === source;
+    const matchesSource = source === "Todos" || game.source === source || (source === "Outros" && game.source === "Manual");
     const matchesFavorite = !showFavorites || favorites.includes(game.path);
     return matchesQuery && matchesSource && matchesFavorite;
   }).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")), [games, query, source, showFavorites, favorites]);
@@ -174,6 +174,14 @@ export default function GameHub() {
     } catch (e) { setError(String(e)); }
   };
 
+  const removeManualGame = (path: string) => {
+    const next = manualGames.filter(game => game.path !== path);
+    setManualGames(next);
+    setGames(current => current.filter(game => game.path !== path));
+    try { localStorage.setItem("diamandis.gamehub.manualGames", JSON.stringify(next)); }
+    catch { setError("Não foi possível atualizar a biblioteca manual local."); }
+  };
+
   const addManualGame = async () => {
     setError("");
     try {
@@ -235,7 +243,7 @@ export default function GameHub() {
       filtered.length ? <div className="gamehub-grid">{filtered.map(game => <article className="game-card" key={game.path}>
         <div className="game-card-cover"><Gamepad2 size={25}/><span>{game.source}</span></div>
         <div className="game-card-main"><strong title={game.name}>{game.name}</strong><span className="game-card-platform">{game.source} <i/> INSTALADO</span><code title={game.path}>{game.path}</code></div>
-        <div className="game-card-actions"><button className={favorites.includes(game.path) ? "game-icon-button favorite" : "game-icon-button"} onClick={() => toggleFavorite(game.path)} title="Adicionar aos favoritos" aria-label={favorites.includes(game.path) ? "Remover dos favoritos" : "Adicionar aos favoritos"}><Heart size={15} fill={favorites.includes(game.path) ? "currentColor" : "none"}/></button><button className="game-icon-button" onClick={() => void copyPath(game.path)} title="Copiar caminho" aria-label="Copiar caminho da instalação"><Copy size={15}/></button><button className="game-icon-button" onClick={() => void openGameFolder(game.path)} title="Abrir pasta de instalação" aria-label="Abrir pasta de instalação" disabled={openingPath === game.path}><FolderOpen size={15}/></button><button className="game-icon-button" onClick={() => void configureExecutable(game)} title="Selecionar executável do jogo" aria-label="Selecionar executável do jogo"><Settings2 size={15}/></button><button className="game-icon-button" onClick={() => void launchGame(game)} title={launchTargets[game.path] ? "Iniciar jogo" : "Configurar executável para iniciar"} aria-label={launchTargets[game.path] ? "Iniciar jogo" : "Configurar executável para iniciar"} disabled={launchingPath === game.path}>{launchingPath === game.path ? <LoaderCircle className="spin" size={15}/> : <Play size={15}/>}</button></div>
+        <div className="game-card-actions"><button className={favorites.includes(game.path) ? "game-icon-button favorite" : "game-icon-button"} onClick={() => toggleFavorite(game.path)} title="Adicionar aos favoritos" aria-label={favorites.includes(game.path) ? "Remover dos favoritos" : "Adicionar aos favoritos"}><Heart size={15} fill={favorites.includes(game.path) ? "currentColor" : "none"}/></button><button className="game-icon-button" onClick={() => void copyPath(game.path)} title="Copiar caminho" aria-label="Copiar caminho da instalação"><Copy size={15}/></button><button className="game-icon-button" onClick={() => void openGameFolder(game.path)} title="Abrir pasta de instalação" aria-label="Abrir pasta de instalação" disabled={openingPath === game.path}><FolderOpen size={15}/></button><button className="game-icon-button" onClick={() => void configureExecutable(game)} title="Selecionar executável do jogo" aria-label="Selecionar executável do jogo"><Settings2 size={15}/></button><button className="game-icon-button" onClick={() => void launchGame(game)} title={launchTargets[game.path] ? "Iniciar jogo" : "Configurar executável para iniciar"} aria-label={launchTargets[game.path] ? "Iniciar jogo" : "Configurar executável para iniciar"} disabled={launchingPath === game.path}>{launchingPath === game.path ? <LoaderCircle className="spin" size={15}/> : <Play size={15}/>}</button>{game.source === "Manual" && <button className="game-icon-button" onClick={() => removeManualGame(game.path)} title="Remover da biblioteca" aria-label="Remover jogo manual da biblioteca"><Trash2 size={15}/></button>}</div>
         {copied === game.path && <span className="game-copy-feedback">Caminho copiado</span>}
       </article>)}</div> :
       <div className="gamehub-empty"><Gamepad2 size={31}/><strong>{games.length ? "Nenhum jogo corresponde à busca" : "Sua biblioteca ainda está vazia"}</strong><span>{games.length ? "Experimente outro nome ou remova os filtros." : "O GameHub procura instalações conhecidas de Steam, Epic Games, GOG e XboxGames, além das bibliotecas que você adicionar."}</span>{games.length > 0 && <button className="secondary-button" onClick={() => {setQuery("");setSource("Todos");setShowFavorites(false);}}>Limpar filtros</button>}</div>}
