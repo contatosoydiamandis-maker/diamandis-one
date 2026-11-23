@@ -94,6 +94,9 @@ fn copy_file_new(source: &Path, destination: &Path) -> io::Result<()> {
         if source_len != destination_len {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "file size changed during copy"));
         }
+        if fingerprint_file(source)? != fingerprint_file(destination)? {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "SHA-256 mismatch after file copy"));
+        }
         Ok(())
     })();
     if result.is_err() {
@@ -121,6 +124,9 @@ fn copy_directory_new(source: &Path, destination: &Path) -> io::Result<()> {
             } else {
                 return Err(io::Error::new(io::ErrorKind::Unsupported, "unsupported filesystem entry"));
             }
+        }
+        if fingerprint_tree(source)? != fingerprint_tree(destination)? {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "directory tree fingerprint mismatch after copy"));
         }
         Ok(())
     })();
