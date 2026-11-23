@@ -107,17 +107,20 @@ pub async fn scan_games(custom_roots: Option<Vec<CustomLibraryRoot>>) -> Result<
         .map_err(|_| "Não foi possível concluir a busca de jogos em segundo plano.".to_string())?
 }
 
-fn directory_contains_executable(path: &Path, depth: usize) -> bool {
-    if depth > 4 { return false; }
+fn directory_contains_executable(path: &Path, depth: usize, budget: &mut usize) -> bool {
+    if depth > 4 || *budget == 0 { return false; }
     let Ok(entries) = fs::read_dir(path) else { return false };
-    for entry in entries.flatten() {
+    for entry in entries {
+        if *budget == 0 { break; }
+        *budget -= 1;
+        let Ok(entry) = entry else { continue };
         let item_path = entry.path();
         let Ok(kind) = entry.file_type() else { continue };
         if kind.is_symlink() { continue; }
         if kind.is_file() && item_path.extension().and_then(|v| v.to_str()).is_some_and(|v| v.eq_ignore_ascii_case("exe")) {
             return true;
         }
-        if kind.is_dir() && depth < 4 && directory_contains_executable(&item_path, depth + 1) {
+        if kind.is_dir() && depth < 4 && directory_contains_executable(&item_path, depth + 1, budget) {
             return true;
         }
     }
@@ -128,12 +131,18 @@ fn scan_library_root(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>, roo
     let Ok(root) = root.canonicalize() else { return };
     if !root.is_dir() { return; }
     let Ok(entries) = fs::read_dir(&root) else { return };
-    for entry in entries.flatten() {
+    // Limites evitam que uma pasta de biblioteca gigantesca monopolize a interface.
+    let mut root_budget = 2048usize;
+    for entry in entries {
+        if root_budget == 0 { break; }
+        root_budget -= 1;
+        let Ok(entry) = entry else { continue };
         let path = entry.path();
         let Ok(kind) = entry.file_type() else { continue };
         // Não seguir diretórios simbólicos ao varrer bibliotecas selecionadas.
         if !kind.is_dir() || kind.is_symlink() { continue; }
-        if directory_contains_executable(&path, 0) {
+        let mut game_budget = 1024usize;
+        if directory_contains_executable(&path, 0, &mut game_budget) {
             let name = entry.file_name().to_string_lossy().into_owned();
             add_game(games, seen, name, source, path);
         }
@@ -239,9 +248,24 @@ mod tests {
         ));
         let nested = root.join("Sample Game").join("Content");
         fs::create_dir_all(&nested).unwrap();
-        assert!(!super::directory_contains_executable(&root.join("Sample Game"), 0));
+        let mut budget = 1024;
+        assert!(!super::directory_contains_executable(&root.join("Sample Game"), 0, &mut budget));
         fs::write(nested.join("sample.exe"), b"test").unwrap();
-        assert!(super::directory_contains_executable(&root.join("Sample Game"), 0));
+        let mut budget = 1024;
+        assert!(super::directory_contains_executable(&root.join("Sample Game"), 0, &mut budget));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn executable_search_respects_its_entry_budget() {
+        let root = std::env::temp_dir().join(format!(
+            "diamandis-gamehub-budget-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join("game.exe"), b"test").unwrap();
+        let mut budget = 0;
+        assert!(!super::directory_contains_executable(&root, 0, &mut budget));
         fs::remove_dir_all(root).unwrap();
     }
 
