@@ -170,7 +170,7 @@ fn scan_games_impl(custom_roots: Vec<CustomLibraryRoot>) -> Result<Vec<GameEntry
 
 #[cfg(test)]
 mod tests {
-    use super::{quoted_value, resolve_game_folder};
+    use super::{quoted_value, resolve_game_folder, HashSet};
     use std::{fs, time::{SystemTime, UNIX_EPOCH}};
 
     #[test]
