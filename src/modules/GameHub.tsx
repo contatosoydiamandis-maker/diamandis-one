@@ -12,7 +12,7 @@ let cachedGamesKey = "";
 let scanPromise: Promise<Game[]> | null = null;
 let scanPromiseKey = "";
 
-const normalizeWindowsPath = (path: string) => path.replace(/\\/g, "/").replace(/\/+$/, "").toLocaleLowerCase();
+const normalizeWindowsPath = (path: string) => path.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 
 const mergeGames = (scanned: Game[], manual: Game[]): Game[] => {
   const merged = new Map<string, Game>();
@@ -185,7 +185,7 @@ export default function GameHub() {
     try {
       const selected = await open({ directory: true, multiple: false, title: rootSource === "Hydra" ? "Selecione a pasta onde o Hydra guarda os jogos" : "Selecione uma pasta de biblioteca de jogos" });
       if (typeof selected !== "string") return;
-      const next = [...libraryRoots.filter(root => root.path.toLowerCase() !== selected.toLowerCase()), { path: selected, source: rootSource }];
+      const next = [...libraryRoots.filter(root => normalizeWindowsPath(root.path) !== normalizeWindowsPath(selected)), { path: selected, source: rootSource }];
       setLibraryRoots(next);
       try { localStorage.setItem("diamandis.gamehub.libraryRoots", JSON.stringify(next)); }
       catch { setError("Pasta adicionada nesta sessão, mas não foi possível salvar a preferência."); }
@@ -193,7 +193,7 @@ export default function GameHub() {
   };
 
   const removeManualGame = (path: string) => {
-    const next = manualGames.filter(game => game.path !== path);
+    const next = manualGames.filter(game => normalizeWindowsPath(game.path) !== normalizeWindowsPath(path));
     setManualGames(next);
     setGames(current => current.filter(game => game.path !== path));
     try { localStorage.setItem("diamandis.gamehub.manualGames", JSON.stringify(next)); }
@@ -249,7 +249,7 @@ export default function GameHub() {
       <button className="secondary-button" onClick={() => void addLibraryRoot("Outros")}><FolderOpen size={14}/> Adicionar outra biblioteca</button>
       <button className="primary-button compact" onClick={() => void addManualGame()}><Plus size={14}/> Adicionar jogo manual</button>
     </div>
-    {libraryRoots.length > 0 && <div className="gamehub-roots" aria-label="Bibliotecas adicionais">{libraryRoots.map(root => <span key={root.path}>{root.source}: {root.path}<button onClick={() => { const next = libraryRoots.filter(item => item.path !== root.path); setLibraryRoots(next); localStorage.setItem("diamandis.gamehub.libraryRoots", JSON.stringify(next)); }} aria-label={`Remover biblioteca ${root.path}`}>×</button></span>)}</div>}
+    {libraryRoots.length > 0 && <div className="gamehub-roots" aria-label="Bibliotecas adicionais">{libraryRoots.map(root => <span key={root.path}>{root.source}: {root.path}<button onClick={() => { const next = libraryRoots.filter(item => normalizeWindowsPath(item.path) !== normalizeWindowsPath(root.path)); setLibraryRoots(next); localStorage.setItem("diamandis.gamehub.libraryRoots", JSON.stringify(next)); }} aria-label={`Remover biblioteca ${root.path}`}>×</button></span>)}</div>}
     <div className="gamehub-controls">
       <label className="gamehub-search"><Search size={15}/><input aria-label="Buscar jogos por nome" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar por nome do jogo..."/></label>
       <button className={showFavorites ? "gamehub-favorites active" : "gamehub-favorites"} onClick={() => setShowFavorites(value => !value)}><Heart size={14} fill={showFavorites ? "currentColor" : "none"}/> Favoritos <span>{favorites.length}</span></button>
