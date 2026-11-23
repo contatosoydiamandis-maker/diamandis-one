@@ -207,13 +207,13 @@ export default function GameHub() {
       if (typeof folder !== "string") return;
       const executable = await open({ directory: false, multiple: false, defaultPath: folder, title: "Selecione o executável principal do jogo", filters: [{ name: "Executáveis Windows", extensions: ["exe"] }] });
       if (typeof executable !== "string") return;
-      const normalizedFolder = folder.replace(/[\\\\/]+$/, "").toLowerCase();
-      const normalizedExecutable = executable.toLowerCase();
-      if (!normalizedExecutable.startsWith(normalizedFolder + "\\\\")) {
+      const normalizedFolder = normalizeWindowsPath(folder);
+      const normalizedExecutable = normalizeWindowsPath(executable);
+      if (!normalizedExecutable.startsWith(`${normalizedFolder}/`)) {
         setError("O executável precisa estar dentro da pasta selecionada para esse jogo.");
         return;
       }
-      const name = folder.split(/[\\\\/]/).filter(Boolean).pop() || "Jogo manual";
+      const name = folder.replace(/\\\\/g, "/").split("/").filter(Boolean).pop() || "Jogo manual";
       const next = [...manualGames.filter(game => game.path.toLowerCase() !== folder.toLowerCase()), { name, source: "Manual", path: folder, executable }];
       setManualGames(next);
       setGames(current => mergeGames(current, [next[next.length - 1]]));
