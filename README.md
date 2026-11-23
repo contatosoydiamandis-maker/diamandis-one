@@ -2,7 +2,7 @@
 
 **Um hub desktop local-first para Windows:** organização de arquivos, ferramentas de produtividade e gerenciamento da biblioteca gamer em um só lugar.
 
-> **Status: pré-alpha 0.2.0.** A base desktop inclui navegação de arquivos, operações controladas, preferências persistentes, descoberta inicial de jogos Steam/Epic/GOG e Save Center com backups SHA-256 e restauração protegida. O adaptador TOTK Recomp já oferece campanhas isoladas, importação por cópia e backup obrigatório antes de iniciar. A CI automatiza o build do frontend, os testes Rust e a geração do instalador NSIS para Windows. A aprovação deve ser conferida na execução associada ao commit; ainda faltam testes físicos em Windows limpo e validação com uma instalação real do TOTK Recomp.
+> **Status: pré-alpha 0.2.0.** A base desktop inclui navegação de arquivos, operações controladas, preferências persistentes, descoberta local de jogos Steam/Epic/GOG, XboxGames e bibliotecas Hydra/Outros configuradas pelo usuário e Save Center com backups SHA-256 e restauração protegida. O adaptador TOTK Recomp já oferece campanhas isoladas, importação por cópia e backup obrigatório antes de iniciar. A CI automatiza o build do frontend, os testes Rust e a geração do instalador NSIS para Windows. A aprovação deve ser conferida na execução associada ao commit; ainda faltam testes físicos em Windows limpo e validação com uma instalação real do TOTK Recomp.
 
 ## Visão do projeto
 
@@ -26,7 +26,7 @@
 | File Manager | Navegação entre unidades, filtro, criação, renomeação, cópia de arquivos e pastas, movimentação entre volumes com proteção contra perda e Lixeira |
 | Configurações | Tema escuro/claro/sistema, preferências persistentes e validador de manifesto de plugins API v1 |
 | Toolbox | Texto, JSON, Base64, URL, SHA-256, UUID, conversor de cores HEX/RGB e timestamp offline |
-| GameHub | Descoberta somente leitura de jogos Steam, Epic Games e GOG; favoritos e abertura da pasta de instalação |
+| GameHub | Descoberta somente leitura de Steam, Epic, GOG e XboxGames acessíveis; bibliotecas Hydra/Outros configuráveis, cadastro manual, favoritos e inicialização de executáveis validados |
 | Save Center | Cadastro manual de pastas, backups locais, histórico e restauração protegida |
 | Seleção de pastas | Diálogo nativo do Windows via Tauri |
 | Build/instalador | CI gera instalador NSIS x64; instalação física ainda não validada em máquina Windows limpa |
