@@ -329,3 +329,17 @@ button{ -webkit-tap-highlight-color:transparent }
 .settings-actions{display:flex;justify-content:flex-end;gap:8px;margin:12px 0}
 .settings-hint{display:block;margin-top:10px;color:#8d8299;font-size:9px;line-height:1.55}
 :root[data-theme="light"] .settings-field textarea{background:#fff;color:#30263d;border-color:#ded4e8}
+
+
+/* GameHub: bibliotecas unificadas e origens adicionais */
+.gamehub-platforms{grid-template-columns:repeat(auto-fit,minmax(125px,1fr))}
+.platform-mark.xbox{background:#17331f;border-color:#39794b;color:#8be6a1}
+.platform-mark.hydra{background:#202b42;border-color:#3c5d91;color:#9fc4ff}
+.platform-mark.other{background:#30263b;border-color:#70528f;color:#d8baff}
+.gamehub-library-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.gamehub-library-actions button{display:inline-flex;align-items:center;gap:7px}
+.gamehub-roots{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.gamehub-roots span{display:flex;align-items:center;gap:7px;max-width:100%;padding:5px 8px;border:1px solid #393044;border-radius:6px;background:#17151f;color:#bcb0cc;font-size:8px;overflow-wrap:anywhere}
+.gamehub-roots button{border:0;background:transparent;color:#d5b4e8;cursor:pointer;font-size:14px}
+.game-card-actions .game-icon-button[aria-label="Remover jogo manual da biblioteca"]{color:#d59a9a}
+@media(max-width:720px){.gamehub-platforms{grid-template-columns:repeat(2,minmax(0,1fr))}.gamehub-library-actions{display:grid;grid-template-columns:1fr}.gamehub-library-actions button{justify-content:center}}
