@@ -229,6 +229,40 @@ mod tests {
         ));
         assert!(resolve_game_folder(missing.to_str().unwrap()).is_err());
     }
+    #[test]
+    fn detects_executables_in_nested_game_directories() {
+        let root = std::env::temp_dir().join(format!(
+            "diamandis-gamehub-library-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let nested = root.join("Sample Game").join("Content");
+        fs::create_dir_all(&nested).unwrap();
+        assert!(!super::directory_contains_executable(&root.join("Sample Game"), 0));
+        fs::write(nested.join("sample.exe"), b"test").unwrap();
+        assert!(super::directory_contains_executable(&root.join("Sample Game"), 0));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn library_scanner_keeps_source_and_ignores_folders_without_executables() {
+        let root = std::env::temp_dir().join(format!(
+            "diamandis-gamehub-root-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        let game = root.join("Hydra Game");
+        let empty = root.join("Not a game");
+        fs::create_dir_all(&game).unwrap();
+        fs::create_dir_all(&empty).unwrap();
+        fs::write(game.join("game.exe"), b"test").unwrap();
+        let mut games = Vec::new();
+        let mut seen = HashSet::new();
+        super::scan_library_root(&mut games, &mut seen, &root, "Hydra");
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].name, "Hydra Game");
+        assert_eq!(games[0].source, "Hydra");
+        fs::remove_dir_all(root).unwrap();
+    }
+
 }
 
 
