@@ -217,7 +217,7 @@ mod tests {
         super::add_game(&mut games, &mut seen, "Game".into(), "Steam", root.clone());
         super::add_game(&mut games, &mut seen, "Game alias".into(), "Steam", alias);
         assert_eq!(games.len(), 1);
-        assert_eq!(games[0].path, root.canonicalize().unwrap().to_string_lossy());
+        assert_eq!(games[0].path, root.canonicalize().unwrap().to_string_lossy().into_owned());
         fs::remove_dir_all(root).unwrap();
     }
 
