@@ -31,7 +31,7 @@ fn add_game(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>, name: String
     let Ok(metadata) = fs::symlink_metadata(&path) else { return };
     if metadata.file_type().is_symlink() || !metadata.is_dir() { return; }
     let Ok(canonical) = path.canonicalize() else { return };
-    let key = canonical.to_string_lossy().replace('\\\\', "/").to_lowercase();
+    let key = canonical.to_string_lossy().replace('\\', "/").to_lowercase();
     if !seen.insert(key) { return; }
     games.push(GameEntry { name, source: source.into(), path: canonical.to_string_lossy().into_owned() });
 }
