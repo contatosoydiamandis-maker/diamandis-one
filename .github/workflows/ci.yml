@@ -5,9 +5,10 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: checks-${{ github.ref }}
@@ -83,21 +84,6 @@ jobs:
         run: cargo test --manifest-path src-tauri/Cargo.toml --all-targets --locked
       - name: Verify Rust production build is locked
         run: cargo build --manifest-path src-tauri/Cargo.toml --release --locked
-      - name: Commit generated dependency lockfiles to the PR branch
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD_REF: ${{ github.head_ref }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json src-tauri/Cargo.lock
-          git diff --cached --quiet
-          if ($LASTEXITCODE -ne 0) {
-            git commit -m "build: lock frontend and Rust dependencies"
-            git push origin "HEAD:$env:HEAD_REF"
-          }
       - name: Build desktop app and NSIS installer
         run: npm run tauri build
       - name: Smoke test install, launch, uninstall and preserve user data
