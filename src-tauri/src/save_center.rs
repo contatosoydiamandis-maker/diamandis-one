@@ -207,7 +207,9 @@ fn create_backup_for_game(app: &AppHandle, game: &SaveGame) -> Result<SaveBackup
     let root = backup_root(app)?.join(&game.id);
     fs::create_dir_all(&root).map_err(|_| "Não foi possível criar a pasta do jogo.".to_string())?;
     let destination = root.join(&id);
-    fs::create_dir_all(&destination).map_err(|_| "Não foi possível iniciar o backup.".to_string())?;
+    // Reserve the backup directory exclusively. Even an extremely unlikely
+    // identifier collision must never merge into or overwrite an older backup.
+    fs::create_dir(&destination).map_err(|_| "Não foi possível reservar uma pasta exclusiva para o backup.".to_string())?;
     let payload = destination.join("payload");
     let mut stats = (0u64, 0u64);
     if let Err(error) = copy_tree(&source, &payload, &mut stats) {
@@ -472,6 +474,39 @@ mod tests {
         copy_tree(&source, &target, &mut stats).unwrap();
         assert_eq!(fs::read(target.join("nested/save.dat")).unwrap(), b"save-data");
         assert_eq!(stats, (9, 1));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn preserves_empty_nested_directories_when_copying_a_save_tree() {
+        let root = temp_root();
+        let source = root.join("source");
+        let target = root.join("target");
+        fs::create_dir_all(source.join("empty/nested")).unwrap();
+
+        let mut stats = (0, 0);
+        copy_tree(&source, &target, &mut stats).unwrap();
+
+        assert!(target.join("empty/nested").is_dir());
+        assert_eq!(stats, (0, 0));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_symbolic_links_without_copying_the_link_target() {
+        use std::os::unix::fs::symlink;
+        let root = temp_root();
+        let source = root.join("source");
+        let target = root.join("target");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(root.join("outside.dat"), b"do-not-copy").unwrap();
+        symlink(root.join("outside.dat"), source.join("linked.dat")).unwrap();
+
+        let mut stats = (0, 0);
+        assert!(copy_tree(&source, &target, &mut stats).is_err());
+        assert!(!target.join("linked.dat").exists());
+        assert_eq!(fs::read(root.join("outside.dat")).unwrap(), b"do-not-copy");
         fs::remove_dir_all(root).unwrap();
     }
 
