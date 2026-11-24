@@ -327,8 +327,15 @@ pub async fn export_save_backup(app: AppHandle, backup_id: String, game_id: Stri
         fs::create_dir(&destination)
             .map_err(|_| "Não foi possível reservar uma pasta nova para a exportação. Nada foi sobrescrito.".to_string())?;
         let mut stats = (0u64, 0u64);
-        copy_tree(&payload, &destination.join("payload"), &mut stats)
+        let exported_payload = destination.join("payload");
+        copy_tree(&payload, &exported_payload, &mut stats)
             .map_err(|e| { let _ = fs::remove_dir_all(&destination); format!("A exportação falhou e foi revertida: {e}") })?;
+        if let Err(error) = verify_payload(
+            &exported_payload, backup.size_bytes, backup.file_count, &backup.file_hashes
+        ) {
+            let _ = fs::remove_dir_all(&destination);
+            return Err(format!("A cópia exportada não passou na verificação de integridade e foi removida: {error}"));
+        }
         let manifest = match serde_json::to_vec_pretty(&backup) {
             Ok(value) => value,
             Err(_) => { let _ = fs::remove_dir_all(&destination); return Err("Não foi possível preparar o manifesto da exportação.".into()); }
@@ -461,6 +468,29 @@ mod tests {
 
     fn temp_root() -> std::path::PathBuf {
         std::env::temp_dir().join(format!("diamandis-save-test-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()))
+    }
+
+    #[test]
+    fn export_copy_is_verified_against_the_original_backup_manifest() {
+        let root = temp_root();
+        let source = root.join("source");
+        let exported = root.join("exported");
+        fs::create_dir_all(source.join("nested")).unwrap();
+        fs::write(source.join("nested/save.dat"), b"trusted-save").unwrap();
+
+        let expected_hashes = collect_hashes(&source).unwrap();
+        let expected_stats = tree_stats(&source).unwrap();
+        let mut copied_stats = (0u64, 0u64);
+        copy_tree(&source, &exported, &mut copied_stats).unwrap();
+
+        assert_eq!(
+            verify_payload(&exported, expected_stats.0, expected_stats.1, &expected_hashes).unwrap(),
+            (expected_stats.0, expected_stats.1, true)
+        );
+
+        fs::write(exported.join("nested/save.dat"), b"tampered-save").unwrap();
+        assert!(verify_payload(&exported, expected_stats.0, expected_stats.1, &expected_hashes).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
