@@ -83,7 +83,7 @@ function DriveCard({ drive }: { drive: StorageDrive }) {
       <div className="system-drive-heading">
         <span className="system-metric-icon"><Icon size={16}/></span>
         <div><strong>{drive.name}</strong><small>{drive.letter} · {drive.driveType}</small></div>
-        <span className="system-drive-percent">{Math.round(percent)}%</span>
+        <span className="system-drive-percent">{drive.capacityAvailable ? `${Math.round(percent)}%` : "—"}</span>
       </div>
       {drive.capacityAvailable ? <>
         <div className="system-drive-track" role="progressbar" aria-label={`Espaço usado em ${drive.letter}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)}>
