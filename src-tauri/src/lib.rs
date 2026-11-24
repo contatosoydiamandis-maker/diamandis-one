@@ -50,6 +50,12 @@ async fn list_directory(
     }).await.map_err(|_| "Não foi possível carregar esta pasta em segundo plano.".to_string())?
 }
 
+fn file_type_sort_key(name: &str) -> String {
+    PathBuf::from(name).extension()
+        .map(|extension| extension.to_string_lossy().to_lowercase())
+        .unwrap_or_default()
+}
+
 fn matches_directory_filters(name: &str, is_dir: bool, query: &str, kind: &str) -> bool {
     let matches_query = query.is_empty() || name.to_lowercase().contains(query);
     let matches_kind = match kind {
@@ -96,7 +102,9 @@ fn list_directory_impl(
     }
     candidates.sort_by(|a, b| match sort.as_str() {
         "size" => b.3.unwrap_or(0).cmp(&a.3.unwrap_or(0)).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())),
-        "type" => b.2.cmp(&a.2).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())),
+        "type" => b.2.cmp(&a.2)
+            .then_with(|| file_type_sort_key(&a.0).cmp(&file_type_sort_key(&b.0)))
+            .then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())),
         _ => b.2.cmp(&a.2).then_with(|| a.0.to_lowercase().cmp(&b.0.to_lowercase())),
     });
     let total = candidates.len();
@@ -116,7 +124,14 @@ fn list_directory_impl(
 
 #[cfg(test)]
 mod directory_filter_tests {
-    use super::matches_directory_filters;
+    use super::{file_type_sort_key, matches_directory_filters};
+
+    #[test]
+    fn sorts_file_extensions_case_insensitively() {
+        assert_eq!(file_type_sort_key("save.DAT"), "dat");
+        assert_eq!(file_type_sort_key("archive.zip"), "zip");
+        assert_eq!(file_type_sort_key("README"), "");
+    }
 
     #[test]
     fn searches_names_case_insensitively_across_file_types() {
