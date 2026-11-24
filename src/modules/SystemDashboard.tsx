@@ -163,7 +163,7 @@ export default function SystemDashboard() {
       <div className="system-metric-grid">
         <MetricCard icon={Cpu} label="PROCESSADOR" value={metrics?.cpuUsagePercent == null ? "Calculando…" : `${metrics.cpuUsagePercent.toFixed(0)}%`} detail={metrics ? (metrics.logicalCores === null ? "Contagem de processadores indisponível" : `${metrics.logicalCores} processadores lógicos`) : "Aguardando leitura do sistema"} percent={metrics?.cpuUsagePercent}/>
         <MetricCard icon={MemoryStick} label="MEMÓRIA RAM" value={metrics ? formatBytes(memoryUsed) : "Carregando…"} detail={metrics ? `${formatBytes(metrics.memoryAvailableBytes)} disponíveis de ${formatBytes(metrics.memoryTotalBytes)}` : "Aguardando leitura do sistema"} percent={memoryPercent}/>
-        <MetricCard icon={HardDrive} label="ARMAZENAMENTO" value={storageUsed === null ? "Indisponível" : formatBytes(storageUsed)} detail={storageUsed === null ? "Nenhuma unidade local disponível" : `${drives.length} unidades · ${formatBytes(storageFree!)} livres no total`} percent={storagePercent}/>
+        <MetricCard icon={HardDrive} label="ARMAZENAMENTO" value={storageUsed === null ? "Indisponível" : formatBytes(storageUsed)} detail={storageUsed === null ? (drives.length ? `${drives.length} unidades detectadas; capacidade indisponível` : "Nenhuma unidade montada detectada") : `${drives.length} unidades · ${formatBytes(storageFree!)} livres no total`} percent={storagePercent}/>
         <MetricCard icon={Activity} label="GPU" value="Não disponível" detail="Leitura de GPU será adicionada com suporte por fabricante." unavailable/>
       </div>
       {drives.length > 0 && (
