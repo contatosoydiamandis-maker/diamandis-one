@@ -19,11 +19,21 @@ pub struct GameEntry {
 
 fn env_path(key: &str) -> Option<PathBuf> { env::var_os(key).map(PathBuf::from) }
 
+fn has_extension(path: &Path, expected: &str) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case(expected))
+}
+
 fn add_game(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>, name: String, source: &str, path: PathBuf) {
-    if !path.is_dir() { return; }
-    let key = path.to_string_lossy().to_lowercase();
+    // Canonical paths collapse aliases such as "..", mixed separators and
+    // case variants before de-duplication, which is important on Windows.
+    let Ok(metadata) = fs::symlink_metadata(&path) else { return };
+    if metadata.file_type().is_symlink() || !metadata.is_dir() { return; }
+    let Ok(canonical) = path.canonicalize() else { return };
+    let key = canonical.to_string_lossy().replace('\\\\', "/").to_lowercase();
     if !seen.insert(key) { return; }
-    games.push(GameEntry { name, source: source.into(), path: path.to_string_lossy().into_owned() });
+    games.push(GameEntry { name, source: source.into(), path: canonical.to_string_lossy().into_owned() });
 }
 
 fn quoted_value(line: &str, key: &str) -> Option<String> {
@@ -54,7 +64,7 @@ fn scan_steam(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>) {
             let Ok(entries) = fs::read_dir(&steamapps) else { continue };
             for entry in entries.flatten() {
                 let file = entry.path();
-                if file.extension().and_then(|v| v.to_str()) != Some("acf") { continue; }
+                if !has_extension(&file, "acf") { continue; }
                 let Ok(text) = fs::read_to_string(&file) else { continue };
                 let mut name = None;
                 let mut install_dir = None;
@@ -76,7 +86,7 @@ fn scan_epic(games: &mut Vec<GameEntry>, seen: &mut HashSet<String>) {
     let manifests = program_data.join("Epic/EpicGamesLauncher/Data/Manifests");
     let Ok(entries) = fs::read_dir(manifests) else { return };
     for entry in entries.flatten() {
-        if entry.path().extension().and_then(|v| v.to_str()) != Some("item") { continue; }
+        if !has_extension(&entry.path(), "item") { continue; }
         let Ok(contents) = fs::read_to_string(entry.path()) else { continue };
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&contents) else { continue };
         let name = value.get("DisplayName").and_then(|v| v.as_str()).unwrap_or("Jogo Epic").to_string();
@@ -181,8 +191,35 @@ fn scan_games_impl(custom_roots: Vec<CustomLibraryRoot>) -> Result<Vec<GameEntry
 
 #[cfg(test)]
 mod tests {
-    use super::{quoted_value, resolve_game_folder, HashSet};
-    use std::{fs, time::{SystemTime, UNIX_EPOCH}};
+    use super::{has_extension, quoted_value, resolve_game_folder, HashSet};
+    use std::{fs, path::Path, time::{SystemTime, UNIX_EPOCH}};
+
+
+    #[test]
+    fn recognizes_launcher_manifest_extensions_case_insensitively() {
+        assert!(has_extension(Path::new("appmanifest_123.ACF"), "acf"));
+        assert!(has_extension(Path::new("game.ITEM"), "item"));
+        assert!(!has_extension(Path::new("game.item.bak"), "item"));
+        assert!(!has_extension(Path::new("README"), "acf"));
+    }
+
+    #[test]
+    fn deduplicates_games_by_canonical_path() {
+        let root = std::env::temp_dir().join(format!(
+            "diamandis-gamehub-dedupe-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let alias = root.join("nested").join("..");
+        fs::create_dir_all(root.join("nested")).unwrap();
+        let mut games = Vec::new();
+        let mut seen = HashSet::new();
+        super::add_game(&mut games, &mut seen, "Game".into(), "Steam", root.clone());
+        super::add_game(&mut games, &mut seen, "Game alias".into(), "Steam", alias);
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].path, root.canonicalize().unwrap().to_string_lossy());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn reads_quoted_vdf_values() {
