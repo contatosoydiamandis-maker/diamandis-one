@@ -83,8 +83,9 @@ fn safe_name(name: &str) -> Result<String, String> {
 fn copy_profile(source: &Path, destination: &Path) -> Result<(), String> {
     let metadata = fs::symlink_metadata(source).map_err(|_| "A pasta profile original não foi encontrada na instalação.".to_string())?;
     if metadata.file_type().is_symlink() || !metadata.is_dir() { return Err("A origem profile não é uma pasta segura.".into()); }
-    if destination.exists() { return Err("Já existe uma campanha com este identificador.".into()); }
-    fs::create_dir_all(destination).map_err(|_| "Não foi possível criar a pasta da campanha.".to_string())?;
+    // Reserve the destination exclusively to avoid merging into a folder
+    // that appeared after the existence check.
+    fs::create_dir(destination).map_err(|_| "Não foi possível reservar uma pasta nova para a campanha.".to_string())?;
     fn visit(src: &Path, dst: &Path) -> std::io::Result<()> {
         for entry in fs::read_dir(src)? {
             let entry = entry?;
@@ -170,7 +171,7 @@ pub async fn create_empty_totk_campaign(app: AppHandle, name: String) -> Result<
         if game_running()? { return Err("Feche o TOTK Recomp antes de criar ou alterar campanhas.".into()); }
         let id = unique_id();
         let destination = root(&app)?.join("campaigns").join(&id);
-        fs::create_dir_all(&destination).map_err(|_| "Não foi possível criar a campanha vazia.".to_string())?;
+        fs::create_dir(&destination).map_err(|_| "Não foi possível reservar uma pasta nova para a campanha vazia.".to_string())?;
         let campaign = TotkCampaign { id, name, path: destination.to_string_lossy().into_owned(), created_at: stamp() };
         let mut next = config; next.campaigns.push(campaign.clone());
         if let Err(error) = write_config(&app, &next) { let _ = fs::remove_dir_all(&destination); return Err(error); }
@@ -207,8 +208,12 @@ pub async fn is_totk_running() -> Result<bool, String> {
 pub fn ensure_campaign_stopped(app: &AppHandle, save_path: &str) -> Result<(), String> {
     let config = read_config(app)?;
     let candidate = PathBuf::from(save_path).canonicalize().ok();
-    let managed = config.campaigns.iter().any(|campaign| {
-        PathBuf::from(&campaign.path).canonicalize().ok().as_ref() == candidate.as_ref()
+    // Two missing paths both produce None; they must never compare as the
+    // same managed campaign.
+    let managed = candidate.as_ref().is_some_and(|candidate| {
+        config.campaigns.iter().any(|campaign| {
+            PathBuf::from(&campaign.path).canonicalize().ok().as_ref() == Some(candidate)
+        })
     });
     if managed && game_running()? {
         return Err("Feche o TOTK Recomp antes de criar ou restaurar backups desta campanha.".into());

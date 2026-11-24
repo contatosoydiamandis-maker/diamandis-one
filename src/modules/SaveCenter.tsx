@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Archive, CheckCircle2, Clock3, FolderOpen, HardDrive, LoaderCircle, Plus, RefreshCw, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
+import { Archive, CheckCircle2, Clock3, Download, FolderOpen, HardDrive, LoaderCircle, Plus, RefreshCw, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
@@ -150,6 +150,31 @@ export default function SaveCenter() {
     finally { setWorkingId(""); }
   };
 
+  const exportBackup = async (backup: SaveBackup) => {
+    if (!selected) return;
+    try {
+      const destination = await open({ directory: true, multiple: false, title: "Escolha onde exportar este backup" });
+      if (typeof destination !== "string") return;
+      setWorkingId(backup.id); setError(""); setNotice("");
+      const exported = await invoke<string>("export_save_backup", { backupId: backup.id, gameId: selected.id, destinationFolder: destination });
+      setNotice("Backup verificado e exportado para: " + exported);
+    } catch (e) { setError(String(e)); }
+    finally { setWorkingId(""); }
+  };
+
+  const deleteBackup = async (backup: SaveBackup) => {
+    if (!selected) return;
+    const accepted = window.confirm(`Excluir permanentemente o backup de ${formatDate(backup.createdAt)}? Esta ação remove somente esta cópia de segurança. O save original do jogo não será alterado.`);
+    if (!accepted) return;
+    setWorkingId(backup.id); setError(""); setNotice("");
+    try {
+      await invoke("delete_save_backup", { backupId: backup.id, gameId: selected.id });
+      setNotice("Backup removido. Os arquivos originais do jogo permaneceram intactos.");
+      await refresh(selected.id);
+    } catch (e) { setError(String(e)); }
+    finally { setWorkingId(""); }
+  };
+
   const restore = async (backup: SaveBackup) => {
     if (!selected) return;
     const accepted = window.confirm(`Antes de continuar, feche completamente o jogo para evitar que ele sobrescreva os arquivos restaurados.\n\nRestaurar o backup de ${formatDate(backup.createdAt)}? O save atual será preservado em uma pasta de segurança antes da troca.`);
@@ -220,7 +245,9 @@ export default function SaveCenter() {
           {busy ? <div className="save-empty"><LoaderCircle className="spin" size={22}/><span>Carregando histórico...</span></div> : backups.length ? <div className="save-backup-list">{backups.map(backup => <article className="save-backup-row" key={backup.id}>
             <div className="save-backup-icon"><Archive size={16}/></div><div className="save-backup-info"><strong>{formatDate(backup.createdAt)}</strong><span>{backup.fileCount} arquivo(s) • {formatSize(backup.sizeBytes)} • {Object.keys(backup.fileHashes || {}).length ? "SHA-256 verificado" : "Verificação estrutural"}</span><small>{backup.backupPath}</small></div>
             <button className="game-icon-button" title="Verificar integridade deste backup" onClick={() => void verify(backup)} disabled={!!workingId}><ShieldCheck size={15}/></button>
+            <button className="game-icon-button" title="Exportar backup verificado" onClick={() => void exportBackup(backup)} disabled={!!workingId}><Download size={15}/></button>
             <button className="game-icon-button" title="Restaurar este backup" onClick={() => void restore(backup)} disabled={!!workingId}><RotateCcw size={15}/></button>
+            <button className="game-icon-button save-remove-button" title="Excluir somente este backup" onClick={() => void deleteBackup(backup)} disabled={!!workingId}><Trash2 size={15}/></button>
           </article>)}</div> : <div className="save-empty compact-empty"><Archive size={22}/><strong>Seu primeiro backup começa aqui</strong><span>Crie uma cópia antes de trocar ou atualizar seus saves.</span></div>}
         </> : !adding && <div className="save-empty save-select-empty"><HardDrive size={28}/><strong>Selecione um jogo</strong><span>Ou cadastre uma pasta de salvamento para começar.</span></div>}
       </div>

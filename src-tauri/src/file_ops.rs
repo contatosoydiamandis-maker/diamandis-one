@@ -1,4 +1,5 @@
-use std::{fs, path::{Component, Path, PathBuf}};
+use sha2::{Digest, Sha256};
+use std::{collections::BTreeMap, fs, io::{self, Read}, path::{Component, Path, PathBuf}};
 
 pub fn validate_name(name: &str) -> Result<&str, String> {
     let clean = name.trim();
@@ -63,24 +64,142 @@ pub async fn copy_file(path: String, destination_folder_path: String) -> Result<
 
 fn copy_file_impl(path: String, destination_folder_path: String) -> Result<(), String> {
     let source = existing_item(&path)?;
-    if !source.is_file() {
-        return Err("A cópia de pastas ainda não está disponível. Selecione um arquivo.".into());
-    }
     let folder = destination_folder(&destination_folder_path)?;
     let name = source.file_name().ok_or("Nome de arquivo inválido.")?;
     let destination = folder.join(name);
     if destination.exists() {
         return Err("Já existe um item com esse nome no destino. Nada foi sobrescrito.".into());
     }
-    let mut input = fs::File::open(&source).map_err(|_| "Não foi possível abrir o arquivo de origem.".to_string())?;
-    let mut output = fs::OpenOptions::new().write(true).create_new(true).open(&destination)
-        .map_err(|_| "Não foi possível criar a cópia no destino. Verifique as permissões e o espaço disponível.".to_string())?;
-    if std::io::copy(&mut input, &mut output).is_err() || output.sync_all().is_err() {
-        drop(output);
-        let _ = fs::remove_file(&destination);
-        return Err("A cópia foi interrompida ou não pôde ser gravada. O arquivo incompleto foi removido.".into());
+    if folder.starts_with(&source) {
+        return Err("Não é possível copiar uma pasta para dentro dela mesma ou de uma subpasta.".into());
     }
-    Ok(())
+    let result = if source.is_dir() {
+        copy_directory_new(&source, &destination)
+    } else if source.is_file() {
+        copy_file_new(&source, &destination)
+    } else {
+        return Err("Este tipo de item não pode ser copiado.".into());
+    };
+    result.map_err(|_| "Não foi possível concluir a cópia. Verifique as permissões e o espaço disponível; a origem foi preservada e a cópia incompleta foi removida.".into())
+}
+
+fn copy_file_new(source: &Path, destination: &Path) -> io::Result<()> {
+    let mut input = fs::File::open(source)?;
+    let mut output = fs::OpenOptions::new().write(true).create_new(true).open(destination)?;
+    let result = (|| {
+        io::copy(&mut input, &mut output)?;
+        output.sync_all()?;
+        let source_len = input.metadata()?.len();
+        let destination_len = output.metadata()?.len();
+        if source_len != destination_len {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "file size changed during copy"));
+        }
+        if fingerprint_file(source)? != fingerprint_file(destination)? {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "SHA-256 mismatch after file copy"));
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        drop(output);
+        let _ = fs::remove_file(destination);
+    }
+    result
+}
+
+fn copy_directory_new(source: &Path, destination: &Path) -> io::Result<()> {
+    fs::create_dir(destination)?;
+    let result = (|| {
+        for entry in fs::read_dir(source)? {
+            let entry = entry?;
+            let source_path = entry.path();
+            let destination_path = destination.join(entry.file_name());
+            let kind = entry.file_type()?;
+            if kind.is_symlink() {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "symbolic links are not copied"));
+            }
+            if kind.is_dir() {
+                copy_directory_new(&source_path, &destination_path)?;
+            } else if kind.is_file() {
+                copy_file_new(&source_path, &destination_path)?;
+            } else {
+                return Err(io::Error::new(io::ErrorKind::Unsupported, "unsupported filesystem entry"));
+            }
+        }
+        if fingerprint_tree(source)? != fingerprint_tree(destination)? {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "directory tree fingerprint mismatch after copy"));
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_dir_all(destination);
+    }
+    result
+}
+
+fn fingerprint_file(path: &Path) -> io::Result<String> {
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 { break; }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+// Captures names, empty directories, file sizes and SHA-256 hashes. A move
+// across volumes is only allowed to delete its source after this matches.
+fn fingerprint_tree(root: &Path) -> io::Result<BTreeMap<String, String>> {
+    fn visit(root: &Path, current: &Path, entries: &mut BTreeMap<String, String>) -> io::Result<()> {
+        for item in fs::read_dir(current)? {
+            let item = item?;
+            let path = item.path();
+            let kind = item.file_type()?;
+            let relative = path.strip_prefix(root)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "path escaped root"))?
+                .to_string_lossy().replace('\\', "/");
+            if kind.is_symlink() {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "symbolic links cannot be verified for a move"));
+            }
+            if kind.is_dir() {
+                entries.insert(relative.clone(), "directory".into());
+                visit(root, &path, entries)?;
+            } else if kind.is_file() {
+                let size = item.metadata()?.len();
+                let hash = fingerprint_file(&path)?;
+                entries.insert(relative, format!("file:{size}:{hash}"));
+            } else {
+                return Err(io::Error::new(io::ErrorKind::Unsupported, "unsupported filesystem entry"));
+            }
+        }
+        Ok(())
+    }
+
+    let metadata = fs::symlink_metadata(root)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "move root is not a safe directory"));
+    }
+    let mut entries = BTreeMap::new();
+    visit(root, root, &mut entries)?;
+    Ok(entries)
+}
+
+fn is_cross_device_error(error: &io::Error) -> bool {
+    #[cfg(windows)]
+    { error.raw_os_error() == Some(17) }
+    #[cfg(unix)]
+    { error.raw_os_error() == Some(18) }
+    #[cfg(not(any(windows, unix)))]
+    { let _ = error; false }
+}
+
+fn remove_moved_source(source: &Path) -> io::Result<()> {
+    if source.is_dir() {
+        fs::remove_dir_all(source)
+    } else {
+        fs::remove_file(source)
+    }
 }
 
 #[tauri::command]
@@ -97,8 +216,47 @@ fn move_item_impl(path: String, destination_folder_path: String) -> Result<(), S
     if destination.exists() {
         return Err("Já existe um item com esse nome no destino. Nada foi sobrescrito.".into());
     }
-    fs::rename(source, destination)
-        .map_err(|_| "Não foi possível mover o item. Verifique se origem e destino estão no mesmo disco e se o item não está em uso.".into())
+    if folder.starts_with(&source) {
+        return Err("Não é possível mover uma pasta para dentro dela mesma ou de uma subpasta.".into());
+    }
+
+    match fs::rename(&source, &destination) {
+        Ok(()) => Ok(()),
+        Err(error) if is_cross_device_error(&error) => {
+            let copy_result = if source.is_dir() {
+                copy_directory_new(&source, &destination)
+            } else if source.is_file() {
+                copy_file_new(&source, &destination)
+            } else {
+                return Err("Este tipo de item não pode ser movido entre unidades.".into());
+            };
+            if let Err(error) = copy_result {
+                return Err(format!("A cópia entre unidades falhou: {error}. A origem foi preservada e qualquer cópia incompleta foi removida."));
+            }
+
+            // Verify the copied bytes and directory structure before deleting
+            // anything. If the source changed while copying, keep both copies.
+            let verified = if source.is_dir() {
+                match (fingerprint_tree(&source), fingerprint_tree(&destination)) {
+                    (Ok(original), Ok(copied)) => original == copied,
+                    _ => false,
+                }
+            } else {
+                match (fingerprint_file(&source), fingerprint_file(&destination)) {
+                    (Ok(original), Ok(copied)) => original == copied,
+                    _ => false,
+                }
+            };
+            if !verified {
+                return Err("A cópia foi criada, mas a verificação SHA-256/estrutura não confirmou que ela corresponde à origem. Os dois locais foram preservados; confira os arquivos antes de tentar novamente.".into());
+            }
+
+            remove_moved_source(&source).map_err(|_| {
+                "A cópia foi verificada, mas o Windows não permitiu remover a origem. Os arquivos foram preservados nos dois locais; confira antes de apagar qualquer cópia.".to_string()
+            })
+        }
+        Err(_) => Err("Não foi possível mover o item. Verifique permissões, espaço disponível e se o item está em uso.".into()),
+    }
 }
 
 #[tauri::command]
@@ -118,7 +276,34 @@ fn delete_item_impl(path: String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_name;
+    use super::{copy_directory_new, copy_file_impl, copy_file_new, fingerprint_tree, move_item_impl, validate_name};
+    use std::{fs, time::{SystemTime, UNIX_EPOCH}};
+
+    fn temp_root(label: &str) -> std::path::PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "diamandis-file-ops-{label}-{}",
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    #[test]
+    fn tree_fingerprint_detects_content_and_empty_directory_changes() {
+        let root = temp_root("fingerprint");
+        let source = root.join("source");
+        let copy = root.join("copy");
+        fs::create_dir_all(source.join("empty")).unwrap();
+        fs::write(source.join("save.dat"), b"original").unwrap();
+        copy_directory_new(&source, &copy).unwrap();
+
+        assert_eq!(fingerprint_tree(&source).unwrap(), fingerprint_tree(&copy).unwrap());
+        fs::write(copy.join("save.dat"), b"modified").unwrap();
+        assert_ne!(fingerprint_tree(&source).unwrap(), fingerprint_tree(&copy).unwrap());
+        fs::remove_dir_all(copy.join("empty")).unwrap();
+        assert_ne!(fingerprint_tree(&source).unwrap(), fingerprint_tree(&copy).unwrap());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn accepts_normal_windows_names() {
@@ -131,5 +316,97 @@ mod tests {
         for name in ["", " ", "..", "../outside", "folder\\\\child", "CON", "NUL.txt", "COM1", "LPT9.log", "NUL .txt", "CONOUT$", "COM¹", "bad?.txt", "trailing."] {
             assert!(validate_name(name).is_err(), "name should be rejected: {name}");
         }
+    }
+
+    #[test]
+    fn refuses_to_overwrite_an_existing_file_during_copy() {
+        let root = temp_root("no-overwrite");
+        let source = root.join("source.txt");
+        let destination = root.join("destination.txt");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&destination, b"keep me").unwrap();
+
+        assert!(copy_file_new(&source, &destination).is_err());
+        assert_eq!(fs::read(&destination).unwrap(), b"keep me");
+        assert_eq!(fs::read(&source).unwrap(), b"source");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn copies_a_folder_from_the_file_manager_and_preserves_the_source() {
+        let root = temp_root("copy-folder");
+        let source = root.join("source");
+        let destination_root = root.join("destination-root");
+        fs::create_dir_all(source.join("nested")).unwrap();
+        fs::create_dir_all(&destination_root).unwrap();
+        fs::write(source.join("nested/save.dat"), b"game-save").unwrap();
+
+        copy_file_impl(
+            source.to_string_lossy().into_owned(),
+            destination_root.to_string_lossy().into_owned(),
+        ).unwrap();
+
+        assert_eq!(fs::read(destination_root.join("source/nested/save.dat")).unwrap(), b"game-save");
+        assert!(source.join("nested/save.dat").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn refuses_to_copy_a_folder_into_itself() {
+        let root = temp_root("copy-descendant");
+        let source = root.join("source");
+        fs::create_dir_all(source.join("nested")).unwrap();
+        let result = copy_file_impl(
+            source.to_string_lossy().into_owned(),
+            source.join("nested").to_string_lossy().into_owned(),
+        );
+        assert!(result.is_err());
+        assert!(source.join("nested").is_dir());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn copies_directory_trees_without_touching_the_source() {
+        let root = temp_root("copy-tree");
+        let source = root.join("source");
+        let destination = root.join("destination");
+        fs::create_dir_all(source.join("nested")).unwrap();
+        fs::write(source.join("root.txt"), b"root data").unwrap();
+        fs::write(source.join("nested/child.txt"), b"nested data").unwrap();
+
+        copy_directory_new(&source, &destination).unwrap();
+
+        assert_eq!(fs::read(destination.join("root.txt")).unwrap(), b"root data");
+        assert_eq!(fs::read(destination.join("nested/child.txt")).unwrap(), b"nested data");
+        assert!(source.join("root.txt").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_symbolic_links_in_directory_copies() {
+        use std::os::unix::fs::symlink;
+        let root = temp_root("symlink");
+        let source = root.join("source");
+        let destination = root.join("destination");
+        fs::create_dir(&source).unwrap();
+        fs::write(root.join("outside.txt"), b"outside").unwrap();
+        symlink(root.join("outside.txt"), source.join("link.txt")).unwrap();
+
+        assert!(copy_directory_new(&source, &destination).is_err());
+        assert!(!destination.exists());
+        assert_eq!(fs::read(root.join("outside.txt")).unwrap(), b"outside");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn refuses_moving_a_directory_into_its_descendant() {
+        let root = temp_root("descendant");
+        let source = root.join("source");
+        fs::create_dir_all(source.join("nested")).unwrap();
+        let result = move_item_impl(source.to_string_lossy().into_owned(), source.join("nested").to_string_lossy().into_owned());
+        assert!(result.is_err());
+        assert!(source.join("nested").is_dir());
+        fs::remove_dir_all(root).unwrap();
     }
 }

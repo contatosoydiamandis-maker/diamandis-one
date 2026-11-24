@@ -14,5 +14,10 @@ if (icon.length < 22 || icon.readUInt16LE(0) !== 0 || icon.readUInt16LE(2) !== 1
   throw new Error("O arquivo de ícone não possui um cabeçalho ICO válido.");
 }
 await mkdir(dirname(target), { recursive: true });
-await writeFile(target, icon);
-console.log("Ícone do DIAMANDIS ONE preparado.");
+const current = await readFile(target).catch(() => null);
+if (current?.equals(icon)) {
+  console.log("Ícone do DIAMANDIS ONE já está atualizado.");
+} else {
+  await writeFile(target, icon);
+  console.log("Ícone do DIAMANDIS ONE preparado.");
+}

@@ -296,3 +296,50 @@ button{ -webkit-tap-highlight-color:transparent }
 :root[data-theme="light"] .system-dashboard-foot{border-color:#e9e2ef}
 @media(max-width:1050px){.system-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.system-dashboard{padding:12px}.system-metric-grid{grid-template-columns:1fr 1fr}.system-metric-card{padding:10px}.system-metric-value{font-size:19px}.system-dashboard-foot{flex-direction:column}}
+
+.system-drives{margin-top:16px;padding-top:14px;border-top:1px solid #ffffff0c}
+.system-drives-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.system-drives-heading h4{margin:0;color:#e8e0ef;font-size:12px;font-weight:650}
+.system-drives-heading>span{color:#92879e;font:8px ui-monospace,monospace;letter-spacing:.5px}
+.system-drive-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.system-drive-card{min-width:0;padding:12px;border:1px solid #393044;border-radius:9px;background:linear-gradient(145deg,#1c1924,#121119)}
+.system-drive-heading{display:flex;align-items:center;gap:9px;min-width:0}
+.system-drive-heading>div{display:flex;flex:1;flex-direction:column;min-width:0;gap:3px}
+.system-drive-heading strong{overflow:hidden;color:#eee5f5;font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.system-drive-heading small{color:#94899f;font-size:9px}
+.system-drive-percent{color:#c7a8e8;font:10px ui-monospace,monospace}
+.system-drive-track{height:5px;margin:12px 0 8px;overflow:hidden;border-radius:5px;background:#342c40}
+.system-drive-track i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#8261b1,#c2a0e8);transition:width .35s ease}
+.system-drive-capacity{display:flex;justify-content:space-between;gap:8px;color:#94899f;font-size:8px}
+:root[data-theme="light"] .system-drives-heading h4{color:#302638}
+:root[data-theme="light"] .system-drive-card{border-color:#ddd4e5;background:#fff}
+:root[data-theme="light"] .system-drive-heading strong{color:#302638}
+:root[data-theme="light"] .system-drive-heading small,:root[data-theme="light"] .system-drive-capacity,:root[data-theme="light"] .system-drives-heading>span{color:#71667a}
+
+/* Toolbox: campos adicionais de conversão */
+.tool-field-label{display:flex;flex-direction:column;gap:7px;margin:8px 0;color:#b9adc9;font-size:9px}
+.tool-field-label input{height:36px;padding:0 10px;border:1px solid #3b3347;border-radius:6px;background:#0e0d14;color:#eee;font-size:11px;outline:0}
+.tool-field-label input:focus{border-color:#9874bc;box-shadow:0 0 0 3px #9874bc18}
+:root[data-theme="light"] .tool-field-label{color:#62596e}
+:root[data-theme="light"] .tool-field-label input{background:#fff;color:#30263d;border-color:#ded4e8}
+
+/* Settings: manifesto de extensões */
+.settings-field textarea{width:100%;min-height:120px;padding:10px;border:1px solid #3b3347;border-radius:7px;background:#0e0d14;color:#eee;font:10px/1.55 ui-monospace,monospace;resize:vertical;outline:0}
+.settings-field textarea:focus{border-color:#9874bc;box-shadow:0 0 0 3px #9874bc18}
+.settings-actions{display:flex;justify-content:flex-end;gap:8px;margin:12px 0}
+.settings-hint{display:block;margin-top:10px;color:#8d8299;font-size:9px;line-height:1.55}
+:root[data-theme="light"] .settings-field textarea{background:#fff;color:#30263d;border-color:#ded4e8}
+
+
+/* GameHub: bibliotecas unificadas e origens adicionais */
+.gamehub-platforms{grid-template-columns:repeat(auto-fit,minmax(125px,1fr))}
+.platform-mark.xbox{background:#17331f;border-color:#39794b;color:#8be6a1}
+.platform-mark.hydra{background:#202b42;border-color:#3c5d91;color:#9fc4ff}
+.platform-mark.other{background:#30263b;border-color:#70528f;color:#d8baff}
+.gamehub-library-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.gamehub-library-actions button{display:inline-flex;align-items:center;gap:7px}
+.gamehub-roots{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.gamehub-roots span{display:flex;align-items:center;gap:7px;max-width:100%;padding:5px 8px;border:1px solid #393044;border-radius:6px;background:#17151f;color:#bcb0cc;font-size:8px;overflow-wrap:anywhere}
+.gamehub-roots button{border:0;background:transparent;color:#d5b4e8;cursor:pointer;font-size:14px}
+.game-card-actions .game-icon-button[aria-label="Remover jogo manual da biblioteca"]{color:#d59a9a}
+@media(max-width:720px){.gamehub-platforms{grid-template-columns:repeat(2,minmax(0,1fr))}.gamehub-library-actions{display:grid;grid-template-columns:1fr}.gamehub-library-actions button{justify-content:center}}

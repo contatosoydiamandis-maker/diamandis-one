@@ -151,10 +151,12 @@ function App() {
 function FileManager() {
   type Entry = { name: string; path: string; isDir: boolean; size: number | null };
   type Listing = { path: string; parent: string | null; total: number; offset: number; limit: number; entries: Entry[] };
+  type Drive = { letter: string; name: string; driveType: string };
   const PAGE_SIZE = 150;
   type Preferences = { theme: string; defaultFolder: string; confirmBeforeDelete: boolean; openLastFolder: boolean; lastFolder: string };
   type ActionMode = "rename" | "copy" | "move" | "delete";
   const [listing, setListing] = useState<Listing | null>(null);
+  const [drives, setDrives] = useState<Drive[]>([]);
   const [path, setPath] = useState("");
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState("");
@@ -170,9 +172,20 @@ function FileManager() {
   const [preferences, setPreferences] = useState<Preferences>({theme:"dark",defaultFolder:"",confirmBeforeDelete:true,openLastFolder:false,lastFolder:""});
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const preferencesRef = useRef(preferences);
+  const loadSequenceRef = useRef(0);
   useEffect(() => { preferencesRef.current = preferences; }, [preferences]);
 
+  const refreshStorageDrives = useCallback(async () => {
+    try {
+      const metrics = await invoke<{ storageDrives: Drive[] }>("get_system_metrics");
+      setDrives(metrics.storageDrives ?? []);
+    } catch {
+      setDrives([]);
+    }
+  }, []);
+
   const load = useCallback(async (target?: string, requestedPage = 0) => {
+    const sequence = ++loadSequenceRef.current;
     setBusy(true); setError(""); setSelected(null);
     try {
       const data = await invoke<Listing>("list_directory", {
@@ -183,6 +196,7 @@ function FileManager() {
         kind: kindFilter,
         sort: sortBy
       });
+      if (sequence !== loadSequenceRef.current) return;
       setListing(data); setPath(data.path); setPage(requestedPage);
       if (preferencesRef.current.openLastFolder && preferencesRef.current.lastFolder !== data.path) {
         const next = { ...preferencesRef.current, lastFolder: data.path };
@@ -190,12 +204,16 @@ function FileManager() {
         setPreferences(next);
         void invoke("save_settings", { settings: next }).catch(() => {});
       }
-    } catch (e) { setError(String(e)); }
-    finally { setBusy(false); }
+    } catch (e) {
+      if (sequence === loadSequenceRef.current) setError(String(e));
+    } finally {
+      if (sequence === loadSequenceRef.current) setBusy(false);
+    }
   }, [filter, kindFilter, sortBy]);
 
   useEffect(() => {
     let active = true;
+    void refreshStorageDrives();
     invoke<Preferences>("load_settings").then(settings => {
       if (!active) return;
       setPreferences(settings);
@@ -204,7 +222,7 @@ function FileManager() {
       setSettingsLoaded(true);
       void load(initial || undefined);
     }).catch(() => { if (active) { setSettingsLoaded(true); void load(); } });
-    return () => { active = false; };
+    return () => { active = false; loadSequenceRef.current += 1; };
   }, []);
 
   useEffect(() => {
@@ -214,6 +232,7 @@ function FileManager() {
   }, [filter, kindFilter, sortBy, settingsLoaded]);
 
   const pageCount = Math.max(1, Math.ceil((listing?.total ?? 0) / PAGE_SIZE));
+  const currentDrive = /^[A-Za-z]:/.test(path) ? path.slice(0, 2).toUpperCase() : "";
   const visible = listing?.entries ?? [];
   const create = async (event: FormEvent) => {
     event.preventDefault(); if (!listing || !newName.trim()) return;
@@ -248,12 +267,16 @@ function FileManager() {
     <div className="file-toolbar"><div className="file-toolbar-left">
       <button className="toolbar-button" disabled={!listing?.parent || busy} onClick={() => listing?.parent && void load(listing.parent)} title="Pasta anterior"><ArrowLeft size={16}/></button>
       <form className="path-form" onSubmit={e => {e.preventDefault(); void load(path);}}><HardDrive size={15}/><input aria-label="Caminho da pasta" value={path} onChange={e => setPath(e.target.value)} placeholder="Caminho da pasta..."/></form>
-      <button className="toolbar-button" disabled={busy} onClick={() => void load(path || undefined)} title="Atualizar"><RefreshCw size={15}/></button>
+      <button className="toolbar-button" disabled={busy} onClick={() => { void load(path || undefined); void refreshStorageDrives(); }} title="Atualizar pasta e unidades"><RefreshCw size={15}/></button>
+      <select className="file-sort file-drive-select" aria-label="Trocar unidade de armazenamento" value={currentDrive} disabled={busy || drives.length === 0} onChange={e => { const drive = drives.find(item => item.letter === e.target.value); if (drive) void load(`${drive.letter}\\`); }}>
+        <option value="">Unidades</option>
+        {drives.map(drive => <option key={drive.letter} value={drive.letter}>{drive.name} ({drive.letter})</option>)}
+      </select>
     </div><button className="primary-button compact" onClick={() => setShowNew(v => !v)}><FolderPlus size={15}/> Nova pasta</button></div>
     {showNew && <form className="new-folder-form" onSubmit={create}><FolderPlus size={16}/><input autoFocus value={newName} onChange={e => setNewName(e.target.value)} placeholder="Nome da nova pasta"/><button className="primary-button compact" disabled={!newName.trim()}>Criar pasta</button><button type="button" className="toolbar-button" onClick={() => setShowNew(false)}>Cancelar</button></form>}
     {selected && <div className="file-selection-bar"><span><strong>{selected.name}</strong> selecionado</span><div>
       <button onClick={() => openAction("rename")}>Renomear</button>
-      {!selected.isDir && <button onClick={() => openAction("copy")}>Copiar</button>}
+      <button onClick={() => openAction("copy")}>Copiar</button>
       <button onClick={() => openAction("move")}>Mover</button>
       <button className="danger-action" onClick={() => openAction("delete")}>Enviar à Lixeira</button>
     </div></div>}
@@ -267,8 +290,8 @@ function FileManager() {
     <div className="file-pagination"><span>Mostrando {listing?.entries.length ?? 0} de {listing?.total ?? 0} itens nesta pasta</span><div><button className="toolbar-button" disabled={busy || page <= 0} onClick={() => listing && void load(listing.path, page - 1)}>Anterior</button><strong>{page + 1} / {pageCount}</strong><button className="toolbar-button" disabled={busy || page + 1 >= pageCount} onClick={() => listing && void load(listing.path, page + 1)}>Próxima</button></div></div>
     <div className="file-manager-foot"><ShieldCheck size={14}/> Exclusões vão para a Lixeira. Cópias e movimentos não sobrescrevem arquivos existentes.</div>
     {action && selected && <div className="file-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setAction(null); }}><div className="file-modal" role="dialog" aria-modal="true" aria-labelledby="file-modal-title">
-      <h3 id="file-modal-title">{action === "rename" ? "Renomear item" : action === "copy" ? "Copiar arquivo" : action === "move" ? "Mover item" : "Enviar para a Lixeira"}</h3>
-      <p>{action === "delete" ? <>O item <strong>{selected.name}</strong> será enviado à Lixeira do Windows. Ele não será excluído permanentemente.</> : action === "rename" ? "Informe o novo nome. A extensão pode ser mantida ou alterada." : action === "copy" ? "Informe o caminho completo da pasta de destino. Arquivos existentes não serão sobrescritos." : "Informe o caminho completo da pasta de destino. A operação não atravessa discos diferentes."}</p>
+      <h3 id="file-modal-title">{action === "rename" ? "Renomear item" : action === "copy" ? "Copiar arquivo ou pasta" : action === "move" ? "Mover item" : "Enviar para a Lixeira"}</h3>
+      <p>{action === "delete" ? <>O item <strong>{selected.name}</strong> será enviado à Lixeira do Windows. Ele não será excluído permanentemente.</> : action === "rename" ? "Informe o novo nome. A extensão pode ser mantida ou alterada." : action === "copy" ? "Informe a pasta de destino. Arquivos e pastas serão copiados sem sobrescrever itens existentes; links simbólicos não são copiados." : "Informe a pasta de destino. Entre unidades diferentes, a cópia é concluída antes de a origem ser removida."}</p>
       {action !== "delete" && <input autoFocus value={actionValue} onChange={e => setActionValue(e.target.value)} placeholder={action === "rename" ? "Novo nome" : "C:\\Caminho\\da\\pasta"}/>}
       <div className="file-modal-actions"><button className="toolbar-button" onClick={() => setAction(null)}>Cancelar</button><button className={action === "delete" ? "danger-button" : "primary-button compact"} onClick={() => void runAction()} disabled={action !== "delete" && !actionValue.trim()}>{action === "delete" ? "Enviar à Lixeira" : "Confirmar"}</button></div>
     </div></div>}
@@ -292,10 +315,26 @@ function Toolbox() {
   const [copied, setCopied] = useState("");
   const [uuid, setUuid] = useState("");
   const [jsonMode, setJsonMode] = useState<"pretty" | "compact">("pretty");
+  const [colorInput, setColorInput] = useState("#9A75ED");
+  const [colorOutput, setColorOutput] = useState("");
+  const [colorError, setColorError] = useState("");
+  const [timestampInput, setTimestampInput] = useState("");
+  const [timestampOutput, setTimestampOutput] = useState("");
+  const [timestampError, setTimestampError] = useState("");
+  const copyTimer = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+  }, []);
+
 
   const copy = async (value: string, key: string) => {
-    try { await navigator.clipboard.writeText(value); setCopied(key); window.setTimeout(() => setCopied(""), 1600); }
-    catch { setCopied("error"); }
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(key);
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+      copyTimer.current = window.setTimeout(() => { setCopied(""); copyTimer.current = null; }, 1600);
+    } catch { setCopied("error"); }
   };
   const transform = (value: string) => setTextValue(value);
   const formatJson = () => {
@@ -327,6 +366,33 @@ function Toolbox() {
       const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(hashInput));
       setHashOutput(Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join(""));
     } catch (e) { setHashError(e instanceof Error ? e.message : "Falha ao calcular SHA-256."); }
+  };
+
+  const convertColor = () => {
+    const value = colorInput.trim().replace(/^#/, "");
+    if (!/^(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(value)) {
+      setColorOutput("");
+      setColorError("Informe uma cor HEX válida, como #9A75ED ou #ABC.");
+      return;
+    }
+    const hex = value.length === 3 ? value.split("").map(char => char + char).join("") : value;
+    const channels = [0, 2, 4].map(index => parseInt(hex.slice(index, index + 2), 16));
+    setColorOutput(`RGB(${channels.join(", ")}) • ` + channels.map(channel => channel.toString().padStart(3, " ")).join(" / "));
+    setColorError("");
+  };
+  const convertTimestamp = () => {
+    const raw = timestampInput.trim();
+    if (!raw) { setTimestampOutput(""); setTimestampError("Informe um timestamp ou uma data ISO."); return; }
+    const numeric = /^-?\\d+(?:\\.\\d+)?$/.test(raw) ? Number(raw) : NaN;
+    const milliseconds = Number.isFinite(numeric) ? (Math.abs(numeric) < 1e12 ? numeric * 1000 : numeric) : Date.parse(raw);
+    const date = new Date(milliseconds);
+    if (!Number.isFinite(milliseconds) || Number.isNaN(date.getTime())) {
+      setTimestampOutput("");
+      setTimestampError("Data inválida. Use segundos, milissegundos ou uma data ISO 8601.");
+      return;
+    }
+    setTimestampOutput(`ISO 8601: ${date.toISOString()}\\nLocal: ${date.toLocaleString("pt-BR")}\\nUnix (s): ${Math.floor(date.getTime() / 1000)}\\nUnix (ms): ${date.getTime()}`);
+    setTimestampError("");
   };
   const words = textValue.trim() ? textValue.trim().split(/\\s+/).length : 0;
   const copyLabel = (key: string) => copied === key ? <><Check size={14}/> Copiado</> : <><Copy size={14}/> Copiar</>;
@@ -383,6 +449,21 @@ function Toolbox() {
         <p>Gere identificadores UUID v4 aleatórios usando o gerador criptográfico do navegador.</p>
         <div className="tool-actions"><button className="primary-button compact" onClick={() => setUuid(crypto.randomUUID())}>Gerar UUID</button>{uuid && <button onClick={() => void copy(uuid,"uuid")}>{copyLabel("uuid")}</button>}</div>
         {uuid && <div className="json-output"><pre>{uuid}</pre></div>}
+      </article>
+
+      <article className="tool-card">
+        <div className="tool-card-heading"><div><span className="tool-kicker">07 / DESIGN</span><h3>Conversor de cores HEX</h3></div><Sparkles size={18}/></div>
+        <label className="tool-field-label">Cor hexadecimal<input value={colorInput} onChange={e => setColorInput(e.target.value)} placeholder="#9A75ED" maxLength={7}/></label>
+        <div className="tool-actions"><button className="primary-button compact" onClick={convertColor}>Converter para RGB</button><button onClick={() => {setColorInput("");setColorOutput("");setColorError("");}}>Limpar</button></div>
+        {colorError && <div className="tool-error">{colorError}</div>}
+        {colorOutput && <div className="json-output"><div><span>RESULTADO</span><button onClick={() => void copy(colorOutput.split(" • ")[0],"color")}>{copyLabel("color")}</button></div><pre>{colorOutput}</pre><div style={{height:24,borderRadius:6,background:colorInput, border:"1px solid #ffffff33"}}/></div>}
+      </article>
+      <article className="tool-card">
+        <div className="tool-card-heading"><div><span className="tool-kicker">08 / DATA E HORA</span><h3>Conversor de timestamp</h3></div><Clock3 size={18}/></div>
+        <textarea value={timestampInput} onChange={e => setTimestampInput(e.target.value)} placeholder="Unix em segundos/milissegundos ou data ISO 8601..." rows={3}/>
+        <div className="tool-actions"><button className="primary-button compact" onClick={convertTimestamp} disabled={!timestampInput.trim()}>Converter data</button><button onClick={() => {setTimestampInput("");setTimestampOutput("");setTimestampError("");}}>Limpar</button></div>
+        {timestampError && <div className="tool-error">{timestampError}</div>}
+        {timestampOutput && <div className="json-output"><div><span>RESULTADO</span><button onClick={() => void copy(timestampOutput,"timestamp")}>{copyLabel("timestamp")}</button></div><pre>{timestampOutput}</pre></div>}
       </article>
     </div>
     {copied === "error" && <div className="tool-error">A área de transferência não está disponível neste ambiente.</div>}

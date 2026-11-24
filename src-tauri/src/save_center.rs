@@ -124,7 +124,9 @@ fn copy_tree(source: &Path, destination: &Path, stats: &mut (u64, u64)) -> io::R
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "links simbólicos não são aceitos"));
     }
     if metadata.is_dir() {
-        fs::create_dir_all(destination)?;
+        // The destination must be new. create_dir_all could merge into an
+        // existing folder and overwrite files after a path race.
+        fs::create_dir(destination)?;
         for entry in fs::read_dir(source)? {
             let entry = entry?;
             copy_tree(&entry.path(), &destination.join(entry.file_name()), stats)?;
@@ -205,7 +207,9 @@ fn create_backup_for_game(app: &AppHandle, game: &SaveGame) -> Result<SaveBackup
     let root = backup_root(app)?.join(&game.id);
     fs::create_dir_all(&root).map_err(|_| "Não foi possível criar a pasta do jogo.".to_string())?;
     let destination = root.join(&id);
-    fs::create_dir_all(&destination).map_err(|_| "Não foi possível iniciar o backup.".to_string())?;
+    // Reserve the backup directory exclusively. Even an extremely unlikely
+    // identifier collision must never merge into or overwrite an older backup.
+    fs::create_dir(&destination).map_err(|_| "Não foi possível reservar uma pasta exclusiva para o backup.".to_string())?;
     let payload = destination.join("payload");
     let mut stats = (0u64, 0u64);
     if let Err(error) = copy_tree(&source, &payload, &mut stats) {
@@ -285,6 +289,66 @@ fn list_backups_impl(app: &AppHandle, game_id: Option<String>) -> Result<Vec<Sav
 pub async fn list_save_backups(app: AppHandle, game_id: Option<String>) -> Result<Vec<SaveBackup>, String> {
     tauri::async_runtime::spawn_blocking(move || list_backups_impl(&app, game_id)).await
         .map_err(|_| "Falha ao carregar o histórico de backups.".to_string())?
+}
+
+fn resolve_backup(app: &AppHandle, backup_id: &str, game_id: &str) -> Result<(SaveGame, SaveBackup, PathBuf), String> {
+    if !safe_id(game_id) || !safe_id(backup_id) {
+        return Err("Identificador de jogo ou backup inválido.".into());
+    }
+    let game = find_game(&read_games(app)?, game_id)?;
+    let backup = list_backups_impl(app, Some(game_id.to_string()))?
+        .into_iter()
+        .find(|item| item.id == backup_id)
+        .ok_or_else(|| "Backup não encontrado para este jogo.".to_string())?;
+    let folder = backup_root(app)?.join(&game.id).join(&backup.id);
+    let metadata = fs::symlink_metadata(&folder)
+        .map_err(|_| "A pasta deste backup não está disponível.".to_string())?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err("O local do backup não é uma pasta segura.".into());
+    }
+    Ok((game, backup, folder))
+}
+
+#[tauri::command]
+pub async fn export_save_backup(app: AppHandle, backup_id: String, game_id: String, destination_folder: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = crate::totk_recomp::operation_lock()?;
+        let (_game, mut backup, folder) = resolve_backup(&app, &backup_id, &game_id)?;
+        let payload = folder.join("payload");
+        verify_payload(&payload, backup.size_bytes, backup.file_count, &backup.file_hashes)?;
+        let parent = PathBuf::from(destination_folder).canonicalize()
+            .map_err(|_| "A pasta escolhida para exportação não está disponível.".to_string())?;
+        if !parent.is_dir() { return Err("O destino da exportação não é uma pasta.".into()); }
+        let destination = parent.join(format!("DIAMANDIS-ONE-backup-{}", backup.id));
+        if destination.exists() {
+            return Err("Já existe uma exportação com este identificador. Escolha outra pasta; nada foi sobrescrito.".into());
+        }
+        backup.backup_path = destination.to_string_lossy().into_owned();
+        fs::create_dir(&destination)
+            .map_err(|_| "Não foi possível reservar uma pasta nova para a exportação. Nada foi sobrescrito.".to_string())?;
+        let mut stats = (0u64, 0u64);
+        copy_tree(&payload, &destination.join("payload"), &mut stats)
+            .map_err(|e| { let _ = fs::remove_dir_all(&destination); format!("A exportação falhou e foi revertida: {e}") })?;
+        let manifest = match serde_json::to_vec_pretty(&backup) {
+            Ok(value) => value,
+            Err(_) => { let _ = fs::remove_dir_all(&destination); return Err("Não foi possível preparar o manifesto da exportação.".into()); }
+        };
+        if let Err(error) = fs::write(destination.join("backup.json"), manifest) {
+            let _ = fs::remove_dir_all(&destination);
+            return Err(format!("Não foi possível finalizar a exportação: {error}"));
+        }
+        Ok(destination.to_string_lossy().into_owned())
+    }).await.map_err(|_| "Falha ao exportar backup em segundo plano.".to_string())?
+}
+
+#[tauri::command]
+pub async fn delete_save_backup(app: AppHandle, backup_id: String, game_id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _operation = crate::totk_recomp::operation_lock()?;
+        let (_game, _backup, folder) = resolve_backup(&app, &backup_id, &game_id)?;
+        fs::remove_dir_all(&folder)
+            .map_err(|_| "Não foi possível remover este backup. Os arquivos originais do jogo não foram alterados.".to_string())
+    }).await.map_err(|_| "Falha ao remover backup em segundo plano.".to_string())?
 }
 
 fn verify_payload(
@@ -410,6 +474,55 @@ mod tests {
         copy_tree(&source, &target, &mut stats).unwrap();
         assert_eq!(fs::read(target.join("nested/save.dat")).unwrap(), b"save-data");
         assert_eq!(stats, (9, 1));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn preserves_empty_nested_directories_when_copying_a_save_tree() {
+        let root = temp_root();
+        let source = root.join("source");
+        let target = root.join("target");
+        fs::create_dir_all(source.join("empty/nested")).unwrap();
+
+        let mut stats = (0, 0);
+        copy_tree(&source, &target, &mut stats).unwrap();
+
+        assert!(target.join("empty/nested").is_dir());
+        assert_eq!(stats, (0, 0));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_symbolic_links_without_copying_the_link_target() {
+        use std::os::unix::fs::symlink;
+        let root = temp_root();
+        let source = root.join("source");
+        let target = root.join("target");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(root.join("outside.dat"), b"do-not-copy").unwrap();
+        symlink(root.join("outside.dat"), source.join("linked.dat")).unwrap();
+
+        let mut stats = (0, 0);
+        assert!(copy_tree(&source, &target, &mut stats).is_err());
+        assert!(!target.join("linked.dat").exists());
+        assert_eq!(fs::read(root.join("outside.dat")).unwrap(), b"do-not-copy");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn refuses_to_merge_backup_into_an_existing_destination() {
+        let root = temp_root();
+        let source = root.join("source");
+        let destination = root.join("destination");
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        fs::write(source.join("save.dat"), b"new-save").unwrap();
+        fs::write(destination.join("save.dat"), b"keep-existing").unwrap();
+
+        let mut stats = (0, 0);
+        assert!(copy_tree(&source, &destination, &mut stats).is_err());
+        assert_eq!(fs::read(destination.join("save.dat")).unwrap(), b"keep-existing");
         fs::remove_dir_all(root).unwrap();
     }
 

@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, Cpu, HardDrive, MemoryStick, RefreshCw } from "lucide-react";
+import { Activity, Cpu, HardDrive, MemoryStick, RefreshCw, Usb } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+
+type StorageDrive = {
+  letter: string;
+  name: string;
+  driveType: string;
+  totalBytes: number;
+  freeBytes: number;
+};
 
 type SystemMetrics = {
   cpuUsagePercent: number | null;
@@ -9,7 +17,19 @@ type SystemMetrics = {
   memoryAvailableBytes: number;
   storageTotalBytes: number | null;
   storageFreeBytes: number | null;
+  storageDrives: StorageDrive[];
 };
+
+let metricsRequest: Promise<SystemMetrics> | null = null;
+
+function loadMetrics(): Promise<SystemMetrics> {
+  if (!metricsRequest) {
+    metricsRequest = invoke<SystemMetrics>("get_system_metrics").finally(() => {
+      metricsRequest = null;
+    });
+  }
+  return metricsRequest;
+}
 
 const formatBytes = (bytes: number) => {
   if (!Number.isFinite(bytes) || bytes < 0) return "Indisponível";
@@ -52,6 +72,29 @@ function MetricCard({
   );
 }
 
+function DriveCard({ drive }: { drive: StorageDrive }) {
+  const usedBytes = Math.max(0, drive.totalBytes - drive.freeBytes);
+  const percent = drive.totalBytes > 0 ? Math.min(100, usedBytes / drive.totalBytes * 100) : 0;
+  const Icon = drive.driveType === "Removível" ? Usb : HardDrive;
+
+  return (
+    <article className="system-drive-card">
+      <div className="system-drive-heading">
+        <span className="system-metric-icon"><Icon size={16}/></span>
+        <div><strong>{drive.name}</strong><small>{drive.letter} · {drive.driveType}</small></div>
+        <span className="system-drive-percent">{Math.round(percent)}%</span>
+      </div>
+      <div className="system-drive-track" role="progressbar" aria-label={`Espaço usado em ${drive.letter}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)}>
+        <i style={{ width: `${percent}%` }}/>
+      </div>
+      <div className="system-drive-capacity">
+        <span>{formatBytes(usedBytes)} usados</span>
+        <span>{formatBytes(drive.freeBytes)} livres de {formatBytes(drive.totalBytes)}</span>
+      </div>
+    </article>
+  );
+}
+
 export default function SystemDashboard() {
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [error, setError] = useState("");
@@ -60,7 +103,7 @@ export default function SystemDashboard() {
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const result = await invoke<SystemMetrics>("get_system_metrics");
+      const result = await loadMetrics();
       setMetrics(result);
       setError("");
     } catch (reason) {
@@ -75,7 +118,7 @@ export default function SystemDashboard() {
     let timeout: number | undefined;
     const poll = async () => {
       try {
-        const result = await invoke<SystemMetrics>("get_system_metrics");
+        const result = await loadMetrics();
         if (active) {
           setMetrics(result);
           setError("");
@@ -97,12 +140,14 @@ export default function SystemDashboard() {
   const memoryPercent = metrics && metrics.memoryTotalBytes > 0
     ? memoryUsed / metrics.memoryTotalBytes * 100
     : null;
-  const storageUsed = metrics?.storageTotalBytes !== null && metrics?.storageTotalBytes !== undefined
-    && metrics.storageFreeBytes !== null && metrics.storageFreeBytes !== undefined
-    ? Math.max(0, metrics.storageTotalBytes - metrics.storageFreeBytes)
+  const drives = metrics?.storageDrives ?? [];
+  const storageTotal = metrics?.storageTotalBytes ?? null;
+  const storageFree = metrics?.storageFreeBytes ?? null;
+  const storageUsed = storageTotal !== null && storageFree !== null
+    ? Math.max(0, storageTotal - storageFree)
     : null;
-  const storagePercent = storageUsed !== null && metrics?.storageTotalBytes
-    ? storageUsed / metrics.storageTotalBytes * 100
+  const storagePercent = storageUsed !== null && storageTotal
+    ? storageUsed / storageTotal * 100
     : null;
 
   return (
@@ -115,10 +160,16 @@ export default function SystemDashboard() {
       <div className="system-metric-grid">
         <MetricCard icon={Cpu} label="PROCESSADOR" value={metrics?.cpuUsagePercent == null ? "Calculando…" : `${metrics.cpuUsagePercent.toFixed(0)}%`} detail={metrics ? (metrics.logicalCores === null ? "Contagem de processadores indisponível" : `${metrics.logicalCores} processadores lógicos`) : "Aguardando leitura do sistema"} percent={metrics?.cpuUsagePercent}/>
         <MetricCard icon={MemoryStick} label="MEMÓRIA RAM" value={metrics ? formatBytes(memoryUsed) : "Carregando…"} detail={metrics ? `${formatBytes(metrics.memoryAvailableBytes)} disponíveis de ${formatBytes(metrics.memoryTotalBytes)}` : "Aguardando leitura do sistema"} percent={memoryPercent}/>
-        <MetricCard icon={HardDrive} label="ARMAZENAMENTO" value={storageUsed === null ? "Indisponível" : formatBytes(storageUsed)} detail={storageUsed === null ? "O Windows não retornou dados da unidade do sistema" : `${formatBytes(metrics!.storageFreeBytes!)} livres de ${formatBytes(metrics!.storageTotalBytes!)}`} percent={storagePercent}/>
+        <MetricCard icon={HardDrive} label="ARMAZENAMENTO" value={storageUsed === null ? "Indisponível" : formatBytes(storageUsed)} detail={storageUsed === null ? "Nenhuma unidade local disponível" : `${drives.length} unidades · ${formatBytes(storageFree!)} livres no total`} percent={storagePercent}/>
         <MetricCard icon={Activity} label="GPU" value="Não disponível" detail="Leitura de GPU será adicionada com suporte por fabricante." unavailable/>
       </div>
-      <div className="system-dashboard-foot"><span><i/> Monitoramento local</span><span>CPU • RAM • Unidade do sistema</span></div>
+      {drives.length > 0 && (
+        <div className="system-drives">
+          <div className="system-drives-heading"><h4>Unidades de armazenamento</h4><span>{drives.length} {drives.length === 1 ? "unidade detectada" : "unidades detectadas"}</span></div>
+          <div className="system-drive-grid">{drives.map((drive) => <DriveCard key={drive.letter} drive={drive}/>)}</div>
+        </div>
+      )}
+      <div className="system-dashboard-foot"><span><i/> Monitoramento local</span><span>CPU • RAM • {drives.length} unidades</span></div>
     </section>
   );
 }
