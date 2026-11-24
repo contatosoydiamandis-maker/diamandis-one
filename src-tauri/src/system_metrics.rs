@@ -31,7 +31,6 @@ pub struct SystemMetrics {
     pub storage_drives: Vec<StorageDrive>,
 }
 
-#[cfg(windows)]
 fn drive_type_label(drive_type: u32) -> Option<&'static str> {
     match drive_type {
         2 => Some("Removível"),
@@ -182,7 +181,8 @@ fn collect() -> Result<SystemMetrics, String> {
     }
 
     storage_drives.sort_by(|a, b| a.letter.cmp(&b.letter));
-    let (storage_total_bytes, storage_free_bytes) = if storage_drives.is_empty() {
+    let has_capacity_data = storage_drives.iter().any(|drive| drive.capacity_available);
+    let (storage_total_bytes, storage_free_bytes) = if !has_capacity_data {
         (None, None)
     } else {
         (
