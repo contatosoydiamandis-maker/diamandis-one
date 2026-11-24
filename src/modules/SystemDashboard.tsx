@@ -8,6 +8,7 @@ type StorageDrive = {
   driveType: string;
   totalBytes: number;
   freeBytes: number;
+  capacityAvailable: boolean;
 };
 
 type SystemMetrics = {
@@ -82,15 +83,17 @@ function DriveCard({ drive }: { drive: StorageDrive }) {
       <div className="system-drive-heading">
         <span className="system-metric-icon"><Icon size={16}/></span>
         <div><strong>{drive.name}</strong><small>{drive.letter} · {drive.driveType}</small></div>
-        <span className="system-drive-percent">{Math.round(percent)}%</span>
+        <span className="system-drive-percent">{drive.capacityAvailable ? `${Math.round(percent)}%` : "—"}</span>
       </div>
-      <div className="system-drive-track" role="progressbar" aria-label={`Espaço usado em ${drive.letter}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)}>
-        <i style={{ width: `${percent}%` }}/>
-      </div>
-      <div className="system-drive-capacity">
-        <span>{formatBytes(usedBytes)} usados</span>
-        <span>{formatBytes(drive.freeBytes)} livres de {formatBytes(drive.totalBytes)}</span>
-      </div>
+      {drive.capacityAvailable ? <>
+        <div className="system-drive-track" role="progressbar" aria-label={`Espaço usado em ${drive.letter}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)}>
+          <i style={{ width: `${percent}%` }}/>
+        </div>
+        <div className="system-drive-capacity">
+          <span>{formatBytes(usedBytes)} usados</span>
+          <span>{formatBytes(drive.freeBytes)} livres de {formatBytes(drive.totalBytes)}</span>
+        </div>
+      </> : <div className="system-drive-capacity"><span>Capacidade indisponível no momento</span><span>{drive.driveType}</span></div>}
     </article>
   );
 }
@@ -160,7 +163,7 @@ export default function SystemDashboard() {
       <div className="system-metric-grid">
         <MetricCard icon={Cpu} label="PROCESSADOR" value={metrics?.cpuUsagePercent == null ? "Calculando…" : `${metrics.cpuUsagePercent.toFixed(0)}%`} detail={metrics ? (metrics.logicalCores === null ? "Contagem de processadores indisponível" : `${metrics.logicalCores} processadores lógicos`) : "Aguardando leitura do sistema"} percent={metrics?.cpuUsagePercent}/>
         <MetricCard icon={MemoryStick} label="MEMÓRIA RAM" value={metrics ? formatBytes(memoryUsed) : "Carregando…"} detail={metrics ? `${formatBytes(metrics.memoryAvailableBytes)} disponíveis de ${formatBytes(metrics.memoryTotalBytes)}` : "Aguardando leitura do sistema"} percent={memoryPercent}/>
-        <MetricCard icon={HardDrive} label="ARMAZENAMENTO" value={storageUsed === null ? "Indisponível" : formatBytes(storageUsed)} detail={storageUsed === null ? "Nenhuma unidade local disponível" : `${drives.length} unidades · ${formatBytes(storageFree!)} livres no total`} percent={storagePercent}/>
+        <MetricCard icon={HardDrive} label="ARMAZENAMENTO" value={storageUsed === null ? "Indisponível" : formatBytes(storageUsed)} detail={storageUsed === null ? (drives.length ? `${drives.length} unidades detectadas; capacidade indisponível` : "Nenhuma unidade montada detectada") : `${drives.length} unidades · ${formatBytes(storageFree!)} livres no total`} percent={storagePercent}/>
         <MetricCard icon={Activity} label="GPU" value="Não disponível" detail="Leitura de GPU será adicionada com suporte por fabricante." unavailable/>
       </div>
       {drives.length > 0 && (

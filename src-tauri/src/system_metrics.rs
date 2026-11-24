@@ -16,6 +16,7 @@ pub struct StorageDrive {
     pub drive_type: String,
     pub total_bytes: u64,
     pub free_bytes: u64,
+    pub capacity_available: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -28,6 +29,17 @@ pub struct SystemMetrics {
     pub storage_total_bytes: Option<u64>,
     pub storage_free_bytes: Option<u64>,
     pub storage_drives: Vec<StorageDrive>,
+}
+
+fn drive_type_label(drive_type: u32) -> Option<&'static str> {
+    match drive_type {
+        2 => Some("Removível"),
+        3 => Some("Disco local"),
+        4 => Some("Rede"),
+        5 => Some("Unidade óptica"),
+        6 => Some("Disco virtual"),
+        _ => None,
+    }
 }
 
 #[cfg(windows)]
@@ -114,10 +126,9 @@ fn collect() -> Result<SystemMetrics, String> {
         return Err("O Windows não conseguiu consultar a memória física.".into());
     }
 
-    // Enumerate mounted local and removable volumes instead of assuming the
-    // system drive is the only storage device available.
-    const DRIVE_REMOVABLE: u32 = 2;
-    const DRIVE_FIXED: u32 = 3;
+    // Enumerate every mounted drive letter. A volume must remain visible in
+    // the File Manager even when its capacity cannot currently be queried
+    // (for example, an empty optical drive or an unavailable network share).
     let logical_drives = unsafe { GetLogicalDrives() };
     let mut storage_drives = Vec::new();
 
@@ -127,13 +138,17 @@ fn collect() -> Result<SystemMetrics, String> {
         let root = format!("{}\\", letter);
         let wide: Vec<u16> = OsStr::new(&root).encode_wide().chain(Some(0)).collect();
         let drive_type = unsafe { GetDriveTypeW(wide.as_ptr()) };
-        if drive_type != DRIVE_FIXED && drive_type != DRIVE_REMOVABLE { continue; }
+        let Some(drive_type_name) = drive_type_label(drive_type) else { continue; };
 
         let mut available = 0u64;
         let mut total = 0u64;
         let mut free = 0u64;
-        if unsafe { GetDiskFreeSpaceExW(wide.as_ptr(), &mut available, &mut total, &mut free) } == 0 {
-            continue;
+        let capacity_available = unsafe {
+            GetDiskFreeSpaceExW(wide.as_ptr(), &mut available, &mut total, &mut free)
+        } != 0;
+        if !capacity_available {
+            total = 0;
+            free = 0;
         }
 
         let mut volume_name = [0u16; 261];
@@ -158,19 +173,23 @@ fn collect() -> Result<SystemMetrics, String> {
         storage_drives.push(StorageDrive {
             letter,
             name,
-            drive_type: if drive_type == DRIVE_REMOVABLE { "Removível".into() } else { "Disco local".into() },
+            drive_type: drive_type_name.into(),
             total_bytes: total,
             free_bytes: free,
+            capacity_available,
         });
     }
 
     storage_drives.sort_by(|a, b| a.letter.cmp(&b.letter));
-    let (storage_total_bytes, storage_free_bytes) = if storage_drives.is_empty() {
+    let has_capacity_data = storage_drives.iter().any(|drive| drive.capacity_available);
+    let (storage_total_bytes, storage_free_bytes) = if !has_capacity_data {
         (None, None)
     } else {
         (
-            storage_drives.iter().try_fold(0u64, |sum, drive| sum.checked_add(drive.total_bytes)),
-            storage_drives.iter().try_fold(0u64, |sum, drive| sum.checked_add(drive.free_bytes)),
+            storage_drives.iter().filter(|drive| drive.capacity_available)
+                .try_fold(0u64, |sum, drive| sum.checked_add(drive.total_bytes)),
+            storage_drives.iter().filter(|drive| drive.capacity_available)
+                .try_fold(0u64, |sum, drive| sum.checked_add(drive.free_bytes)),
         )
     };
 
@@ -209,7 +228,18 @@ pub async fn get_system_metrics() -> Result<SystemMetrics, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{calculate_cpu_usage, CpuTimes};
+    use super::{calculate_cpu_usage, drive_type_label, CpuTimes};
+
+    #[test]
+    fn classifies_supported_windows_drive_types() {
+        assert_eq!(drive_type_label(2), Some("Removível"));
+        assert_eq!(drive_type_label(3), Some("Disco local"));
+        assert_eq!(drive_type_label(4), Some("Rede"));
+        assert_eq!(drive_type_label(5), Some("Unidade óptica"));
+        assert_eq!(drive_type_label(6), Some("Disco virtual"));
+        assert_eq!(drive_type_label(0), None);
+        assert_eq!(drive_type_label(1), None);
+    }
 
     #[test]
     fn calculates_cpu_usage_from_system_time_deltas() {
