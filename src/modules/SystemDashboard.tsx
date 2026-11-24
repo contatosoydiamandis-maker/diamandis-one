@@ -8,6 +8,7 @@ type StorageDrive = {
   driveType: string;
   totalBytes: number;
   freeBytes: number;
+  capacityAvailable: boolean;
 };
 
 type SystemMetrics = {
@@ -84,13 +85,15 @@ function DriveCard({ drive }: { drive: StorageDrive }) {
         <div><strong>{drive.name}</strong><small>{drive.letter} · {drive.driveType}</small></div>
         <span className="system-drive-percent">{Math.round(percent)}%</span>
       </div>
-      <div className="system-drive-track" role="progressbar" aria-label={`Espaço usado em ${drive.letter}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)}>
-        <i style={{ width: `${percent}%` }}/>
-      </div>
-      <div className="system-drive-capacity">
-        <span>{formatBytes(usedBytes)} usados</span>
-        <span>{formatBytes(drive.freeBytes)} livres de {formatBytes(drive.totalBytes)}</span>
-      </div>
+      {drive.capacityAvailable ? <>
+        <div className="system-drive-track" role="progressbar" aria-label={`Espaço usado em ${drive.letter}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)}>
+          <i style={{ width: `${percent}%` }}/>
+        </div>
+        <div className="system-drive-capacity">
+          <span>{formatBytes(usedBytes)} usados</span>
+          <span>{formatBytes(drive.freeBytes)} livres de {formatBytes(drive.totalBytes)}</span>
+        </div>
+      </> : <div className="system-drive-capacity"><span>Capacidade indisponível no momento</span><span>{drive.driveType}</span></div>}
     </article>
   );
 }
