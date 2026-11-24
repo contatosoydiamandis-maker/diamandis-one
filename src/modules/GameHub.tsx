@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
 type Game = { name: string; source: string; path: string; executable?: string };
-type LibraryRoot = { path: string; source: "Hydra" | "Outros" };
+type LibraryRoot = { path: string; source: "Xbox" | "Hydra" | "Outros" };
 type SourceFilter = "Todos" | "Xbox" | "Hydra" | "Steam" | "Epic Games" | "GOG" | "Outros" | "Manual";
 let cachedGames: Game[] | null = null;
 let cachedAt = 0;
@@ -39,7 +39,7 @@ export default function GameHub() {
     catch { return []; }
   });
   const [libraryRoots, setLibraryRoots] = useState<LibraryRoot[]>(() => {
-    try { const value: unknown = JSON.parse(localStorage.getItem("diamandis.gamehub.libraryRoots") || "[]"); return Array.isArray(value) ? value.filter((item): item is LibraryRoot => !!item && typeof item.path === "string" && (item.source === "Hydra" || item.source === "Outros")) : []; }
+    try { const value: unknown = JSON.parse(localStorage.getItem("diamandis.gamehub.libraryRoots") || "[]"); return Array.isArray(value) ? value.filter((item): item is LibraryRoot => !!item && typeof item.path === "string" && (item.source === "Xbox" || item.source === "Hydra" || item.source === "Outros")) : []; }
     catch { return []; }
   });
 
@@ -180,10 +180,10 @@ export default function GameHub() {
     others: games.filter(game => game.source === "Outros" || game.source === "Manual").length
   }), [games]);
 
-  const addLibraryRoot = async (rootSource: "Hydra" | "Outros") => {
+  const addLibraryRoot = async (rootSource: "Xbox" | "Hydra" | "Outros") => {
     setError("");
     try {
-      const selected = await open({ directory: true, multiple: false, title: rootSource === "Hydra" ? "Selecione a pasta onde o Hydra guarda os jogos" : "Selecione uma pasta de biblioteca de jogos" });
+      const selected = await open({ directory: true, multiple: false, title: rootSource === "Hydra" ? "Selecione a pasta onde o Hydra guarda os jogos" : rootSource === "Xbox" ? "Selecione a pasta XboxGames ou outra biblioteca Xbox" : "Selecione uma pasta de biblioteca de jogos" });
       if (typeof selected !== "string") return;
       const next = [...libraryRoots.filter(root => normalizeWindowsPath(root.path) !== normalizeWindowsPath(selected)), { path: selected, source: rootSource }];
       setLibraryRoots(next);
@@ -245,6 +245,7 @@ export default function GameHub() {
     </div>
 
     <div className="gamehub-library-actions">
+      <button className="secondary-button" onClick={() => void addLibraryRoot("Xbox")}><FolderOpen size={14}/> Adicionar biblioteca Xbox</button>
       <button className="secondary-button" onClick={() => void addLibraryRoot("Hydra")}><FolderOpen size={14}/> Adicionar biblioteca Hydra</button>
       <button className="secondary-button" onClick={() => void addLibraryRoot("Outros")}><FolderOpen size={14}/> Adicionar outra biblioteca</button>
       <button className="primary-button compact" onClick={() => void addManualGame()}><Plus size={14}/> Adicionar jogo manual</button>
